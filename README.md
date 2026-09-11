@@ -89,7 +89,8 @@
 ├── CMakeLists.txt / src/ / cmake/ / tools/ / test/ …   # lemonade 源码（本 fork 的服务器）
 ├── webui/          # React + TS + Vite 前端（中英双语）
 ├── engines/        # 预编译 llama.cpp 引擎（含 .installed），可被自动扫描
-├── config/         # 运行配置 config.json / recipe_options.json
+├── config/         # 运行配置：config.example.json（示例，tracked）；
+│                   #   config.json / recipe_options.json（本机私有，自动生成，已 ignore）
 ├── launcher/       # LemonadeStudio 启动器源码与图标
 ├── scripts/        # start.ps1 / install.ps1 / build-webui.ps1
 ├── docs/           # lemonade 文档；docs/engines/ 为引擎编译文档
@@ -130,6 +131,8 @@
 - **模型文件不含**，对方在「模型管理 → 模型下载」里自行下载。
 - 打包时会把 `config.json` 的引擎路径改为**相对路径**（`engines\<name>\llama-server.exe`），因此可移植；
   未打包引擎时这些条目显示为未安装，对方可在「引擎管理」里添加自己的引擎。
+- `config.json` / `recipe_options.json` **不在仓库里**（本机私有、自动生成）；从源码 clone 的人请看
+  [首次使用：获取并注册引擎](#-首次使用获取并注册引擎)。
 
 ---
 
@@ -149,6 +152,23 @@
 base_url = http://localhost:13310/v1
 api_key  = lemonade            # 若设置了 LEMONADE_API_KEY
 ```
+
+---
+
+## 🧩 首次使用：获取并注册引擎
+
+> 仓库**不包含** `config/config.json` 与 `config/recipe_options.json` —— 它们是**本机私有配置**，
+> 应用**第一次保存设置时自动生成**。因此新克隆的仓库里**引擎列表是空的**，需要你自己放引擎。
+
+1. **下载引擎**：到 [Releases](https://github.com/Thegongyx/Lemonade-Multi-Engine-Studio/releases)
+   下载 `engine-*_gfx1151_win.zip`（如 `engine-roc_official_gfx1151_win.zip`），解压到 `engines\`，
+   使结构为 `engines\<引擎名>\llama-server.exe`。
+2. **注册引擎**：启动 `LemonadeMultiEngineStudio.exe` → WebUI「引擎管理 → 引擎列表 → 添加自编引擎」，
+   填入引擎目录（如 `engines\roc_official`）；程序会自动识别 rocm / vulkan / cpu 并写入你的 `config.json`。
+   - 也可以照着 `config/config.example.json` 手写 `config/config.json`（**格式示例，请替换成你自己的引擎**）。
+3. **添加模型**：在「模型管理 → 本地路径」添加你的模型目录（兼容 HF 缓存布局
+   `models--org--repo/snapshots/<commit>/`），或在「模型下载」里在线拉取。
+4. **按模型选引擎**：在模型行的「配置」里选择引擎构建、填写参数 —— 写入本机的 `recipe_options.json`。
 
 ---
 

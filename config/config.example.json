@@ -1,0 +1,22 @@
+{
+  "config_version": 2,
+  "ctx_size": 262144,
+  "llamacpp": {
+    "custom_engines": {
+      "example_rocm": {
+        "backend": "rocm",
+        "device": "ROCm0",
+        "path": "engines\\example_rocm\\llama-server.exe"
+      },
+      "example_vulkan": {
+        "backend": "vulkan",
+        "device": "Vulkan0",
+        "env": {
+          "GGML_VK_ROCMFP4_COOPMAT": "1"
+        },
+        "path": "engines\\example_vulkan\\llama-server.exe"
+      }
+    },
+    "engines_dir": "engines"
+  }
+}

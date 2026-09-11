@@ -102,7 +102,8 @@ Left navigation order: **Models → Chat → Engines → Runtime**.
 ├── CMakeLists.txt / src/ / cmake/ / tools/ / test/ …   # Lemonade source (this fork's server)
 ├── webui/          # React + TS + Vite frontend (bilingual)
 ├── engines/        # Prebuilt llama.cpp engines (auto-scanned; binaries are git-ignored)
-├── config/         # Runtime config: config.json / recipe_options.json
+├── config/         # Runtime config: config.example.json (sample, tracked);
+│                   #   config.json / recipe_options.json (machine-local, auto-generated, git-ignored)
 ├── launcher/       # Launcher source and icon
 ├── scripts/        # start.ps1 / install.ps1 / build-webui.ps1 / package.ps1 / build-installer.ps1
 ├── docs/           # Lemonade docs; docs/engines/ holds engine build guides
@@ -147,6 +148,8 @@ and no extra runtime needed** (`lemond.exe` is statically linked; third-party de
 - Packaging rewrites engine paths in `config.json` to **relative** paths
   (`engines\<name>\llama-server.exe`), so the package is portable; when engines are not bundled the
   entries show as not installed, and the user can add their own under "Engines".
+- `config.json` / `recipe_options.json` are **not in the repo** (machine-local, auto-generated).
+  Building from a fresh clone? See [First run: fetch and register engines](#-first-run-fetch-and-register-engines).
 
 ---
 
@@ -167,6 +170,28 @@ and no extra runtime needed** (`lemond.exe` is statically linked; third-party de
 base_url = http://localhost:13310/v1
 api_key  = lemonade            # if LEMONADE_API_KEY is set
 ```
+
+---
+
+## 🧩 First run: fetch and register engines
+
+> This repo does **not** ship `config/config.json` or `config/recipe_options.json` — they are
+> **machine-local** and are **auto-generated the first time you save a setting**. A fresh clone
+> therefore shows an **empty engine list**; you add your own engines.
+
+1. **Download engines**: grab `engine-*_gfx1151_win.zip` from
+   [Releases](https://github.com/Thegongyx/Lemonade-Multi-Engine-Studio/releases)
+   (e.g. `engine-roc_official_gfx1151_win.zip`) and extract into `engines\`, so the layout is
+   `engines\<engine-name>\llama-server.exe`.
+2. **Register engines**: launch `LemonadeMultiEngineStudio.exe` → WebUI "Engines → Engine list →
+   Add custom engine", point at the folder (e.g. `engines\roc_official`); rocm / vulkan / cpu is
+   detected automatically and written to your `config.json`.
+   - Or hand-write `config/config.json` following `config/config.example.json` (a **format sample —
+     replace it with your own engines**).
+3. **Add models**: use "Models → Local paths" (supports the HF cache layout
+   `models--org--repo/snapshots/<commit>/`) or download them from "Models → Download".
+4. **Pick an engine per model**: in the model row's config, choose the engine build and arguments —
+   saved to your local `recipe_options.json`.
 
 ---
 
