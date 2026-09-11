@@ -216,3 +216,6 @@ CLAUDE.local.md
 
 # Local runtime config (machine-specific; auto-generated on first settings change)
 /config/config.json
+
+# Local per-model saved options (machine-specific; auto-generated when saving model params)
+/config/recipe_options.json
