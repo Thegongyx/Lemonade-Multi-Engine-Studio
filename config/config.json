@@ -1,9 +1,6 @@
 {
   "config_version": 2,
   "ctx_size": 262144,
-  "extra_models_dirs": [
-    "C:\\Users\\xu352\\.cache\\huggingface\\hub"
-  ],
   "llamacpp": {
     "custom_engines": {
       "roc_k2horizon": {
