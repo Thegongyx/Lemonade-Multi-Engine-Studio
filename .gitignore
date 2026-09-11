@@ -213,3 +213,6 @@ CLAUDE.local.md
 
 # Built launcher binary (distributed via GitHub Releases instead)
 /LemonadeMultiEngineStudio.exe
+
+# Local runtime config (machine-specific; auto-generated on first settings change)
+/config/config.json
