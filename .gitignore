@@ -210,3 +210,6 @@ CLAUDE.local.md
 
 # Upstream CI workflows (not needed in this fork; also avoids the token 'workflow' scope)
 /.github/workflows/
+
+# Built launcher binary (distributed via GitHub Releases instead)
+/LemonadeMultiEngineStudio.exe
