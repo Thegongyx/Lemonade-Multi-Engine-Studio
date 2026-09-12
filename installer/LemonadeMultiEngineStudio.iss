@@ -32,7 +32,15 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "autostart"; Description: "开机时自动启动服务 (autostart with Windows)"; GroupDescription: "其它 / Other:"; Flags: unchecked
 
 [Files]
-Source: "..\dist\LemonadeMultiEngineStudio\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+; Program files. config.json is excluded here and installed separately below as
+; user data: the automatic uninstall that runs before an in-place upgrade would
+; otherwise delete the user's model paths, engine registrations and per-model
+; options on every update.
+Source: "..\dist\LemonadeMultiEngineStudio\*"; DestDir: "{app}"; \
+    Excludes: "config\config.json"; Flags: recursesubdirs createallsubdirs ignoreversion
+; User data: write only when absent, and never delete on uninstall.
+Source: "..\dist\LemonadeMultiEngineStudio\config\config.json"; DestDir: "{app}\config"; \
+    Flags: onlyifdoesntexist uninsneveruninstall
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExe}"
@@ -53,4 +61,6 @@ Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM lemond.exe /T"; Flags: runhi
 Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM llama-server.exe /T"; Flags: runhidden; RunOnceId: "KillLlama"
 
 [UninstallDelete]
-Type: filesandordirs; Name: "{app}\data"
+; Only logs. data\cache holds downloaded backends/engines (hundreds of MB) and
+; must survive an upgrade, otherwise every update re-downloads them.
+Type: filesandordirs; Name: "{app}\data\logs"

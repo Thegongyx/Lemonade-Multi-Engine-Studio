@@ -135,6 +135,59 @@ static bool is_llamacpp_cuda_backend(const std::string& backend) {
     return backend == "cuda";
 }
 
+// A --device value only exists on the backend it names. Passing e.g. ROCm0 to a
+// Vulkan build makes llama-server abort outright ("invalid device: ROCm0")
+// instead of falling back, which is what happens when a model that was pinned to
+// one engine is switched to an engine of a different backend.
+static bool device_valid_for_backend(const std::string& device, const std::string& resolved_backend) {
+    if (device.empty()) return true;
+    if (is_llamacpp_rocm_backend(resolved_backend)) return device.rfind("ROCm", 0) == 0;
+    if (resolved_backend == "vulkan") return device.rfind("Vulkan", 0) == 0;
+    if (resolved_backend == "cuda") return device.rfind("CUDA", 0) == 0;
+    if (resolved_backend == "metal") return device.rfind("MTL", 0) == 0;
+    if (resolved_backend == "cpu") return false;
+    return true;
+}
+
+// Value of a --device/-dev token in a raw args string ("" when absent).
+static std::string device_value_in_args(const std::string& args) {
+    const auto tokens = utils::parse_custom_args(args, true);
+    for (size_t i = 0; i < tokens.size(); ++i) {
+        std::string flag = tokens[i];
+        const size_t eq = flag.find('=');
+        if (eq != std::string::npos) {
+            const std::string key = flag.substr(0, eq);
+            if (key == "--device" || key == "-dev") return flag.substr(eq + 1);
+            continue;
+        }
+        if (flag == "--device" || flag == "-dev") {
+            return i + 1 < tokens.size() ? tokens[i + 1] : std::string();
+        }
+    }
+    return "";
+}
+
+// Order-preserving removal of every --device/-dev token (and its value).
+static std::string strip_device_tokens(const std::string& args) {
+    const auto tokens = utils::parse_custom_args(args, true);
+    std::string result;
+    for (size_t i = 0; i < tokens.size(); ++i) {
+        std::string flag = tokens[i];
+        const size_t eq = flag.find('=');
+        const std::string key = eq != std::string::npos ? flag.substr(0, eq) : flag;
+        if (key == "--device" || key == "-dev") {
+            if (eq == std::string::npos && i + 1 < tokens.size() && !tokens[i + 1].empty() &&
+                tokens[i + 1][0] != '-') {
+                ++i;
+            }
+            continue;
+        }
+        if (!result.empty()) result += " ";
+        result += tokens[i];
+    }
+    return result;
+}
+
 // A named, user-supplied llama.cpp build from config.json's
 // llamacpp.custom_engines map. Lets models on the same backend type (e.g. two
 // ROCm builds) run different compiled binaries.
@@ -420,6 +473,24 @@ void LlamaCppServer::load(const std::string& model_name,
     std::string llamacpp_backend = resolve_llamacpp_backend(llamacpp_backend_option);
     if (custom_engine.valid && llamacpp_device.empty() && !custom_engine.device.empty()) {
         llamacpp_device = custom_engine.device;
+    }
+
+    // The selected backend decides which devices exist. Drop a device inherited
+    // from a different engine/backend so llama-server does not abort with
+    // "invalid device" after the model's engine is switched.
+    if (!device_valid_for_backend(llamacpp_device, llamacpp_backend)) {
+        LOG(WARNING, "LlamaCpp") << "Ignoring device '" << llamacpp_device
+                                 << "': not valid for backend " << llamacpp_backend << std::endl;
+        llamacpp_device = custom_engine.valid ? custom_engine.device : std::string();
+    }
+    {
+        const std::string args_device = device_value_in_args(llamacpp_args);
+        if (!args_device.empty() && !device_valid_for_backend(args_device, llamacpp_backend)) {
+            LOG(WARNING, "LlamaCpp") << "Removing --device " << args_device
+                                     << " from llamacpp_args: not valid for backend "
+                                     << llamacpp_backend << std::endl;
+            llamacpp_args = strip_device_tokens(llamacpp_args);
+        }
     }
 
     RuntimeConfig::validate_backend_choice("llamacpp", llamacpp_backend_option);
