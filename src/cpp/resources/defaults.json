@@ -53,7 +53,7 @@
   "log_level": "info",
   "log_max_file_size_mb": 10,
   "log_max_files": 5,
-  "max_loaded_models": 1,
+  "max_loaded_models": 3,
   "models_dir": "auto",
   "moonshine": {
     "args": "",
