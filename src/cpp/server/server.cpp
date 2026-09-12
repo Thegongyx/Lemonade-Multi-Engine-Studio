@@ -7042,14 +7042,17 @@ void Server::handle_engines(const httplib::Request& req, httplib::Response& res)
                         if (existing.value("id", std::string("")) == id) { duplicate = true; break; }
                     }
                     if (duplicate) continue;
-                    // "rocm-stable" -> "rocm"; a bare "cpu" stays "cpu".
+                    // "rocm-stable" -> rocm/ROCm0; a bare "cpu" stays cpu.
                     const std::size_t dash = id.find('-');
                     const std::string backend = dash == std::string::npos ? id : id.substr(0, dash);
+                    std::string device;
+                    if (backend == "rocm") device = "ROCm0";
+                    else if (backend == "vulkan") device = "Vulkan0";
                     engines.push_back({{"id", id},
                                        {"name", id},
                                        {"path", lemon::utils::path_to_utf8(exe)},
                                        {"backend", backend},
-                                       {"device", ""},
+                                       {"device", device},
                                        {"source", "downloaded"},
                                        {"exists", true}});
                 }

@@ -147,42 +147,72 @@ struct CustomEngine {
     bool valid = false;
 };
 
+// Canonical backend + default device for a backend downloaded through the WebUI,
+// whose directory name carries the channel ("rocm-stable", "vulkan-stable", "cpu").
+static void downloaded_engine_backend_device(const std::string& name,
+                                             std::string& backend,
+                                             std::string& device) {
+    auto starts_with = [&name](const char* prefix) { return name.rfind(prefix, 0) == 0; };
+    if (starts_with("rocm")) {
+        backend = "rocm";
+        device = "ROCm0";
+    } else if (starts_with("vulkan")) {
+        backend = "vulkan";
+        device = "Vulkan0";
+    } else {
+        backend = "cpu";
+    }
+}
+
 static CustomEngine resolve_custom_engine(const std::string& name) {
     CustomEngine engine;
     engine.name = name;
     if (name.empty()) return engine;
 
-    auto* cfg = RuntimeConfig::global();
-    if (!cfg) return engine;
-
-    const json section = cfg->backend_config("llamacpp");
-    if (!section.contains("custom_engines") || !section["custom_engines"].is_object()) {
-        return engine;
-    }
-    const auto& engines = section["custom_engines"];
-    if (!engines.contains(name) || !engines[name].is_object()) {
-        return engine;
-    }
-
-    const auto& entry = engines[name];
-    if (entry.contains("path") && entry["path"].is_string()) {
-        engine.path = entry["path"].get<std::string>();
-    }
-    if (entry.contains("backend") && entry["backend"].is_string()) {
-        engine.backend = entry["backend"].get<std::string>();
-    }
-    if (entry.contains("device") && entry["device"].is_string()) {
-        engine.device = entry["device"].get<std::string>();
-    }
-    if (entry.contains("env") && entry["env"].is_object()) {
-        for (auto it = entry["env"].begin(); it != entry["env"].end(); ++it) {
-            if (it.value().is_string()) {
-                engine.env.emplace_back(it.key(), it.value().get<std::string>());
+    // 1) A named build registered in config.json's llamacpp.custom_engines.
+    if (auto* cfg = RuntimeConfig::global()) {
+        const json section = cfg->backend_config("llamacpp");
+        if (section.contains("custom_engines") && section["custom_engines"].is_object()) {
+            const auto& engines = section["custom_engines"];
+            if (engines.contains(name) && engines[name].is_object()) {
+                const auto& entry = engines[name];
+                if (entry.contains("path") && entry["path"].is_string()) {
+                    engine.path = entry["path"].get<std::string>();
+                }
+                if (entry.contains("backend") && entry["backend"].is_string()) {
+                    engine.backend = entry["backend"].get<std::string>();
+                }
+                if (entry.contains("device") && entry["device"].is_string()) {
+                    engine.device = entry["device"].get<std::string>();
+                }
+                if (entry.contains("env") && entry["env"].is_object()) {
+                    for (auto it = entry["env"].begin(); it != entry["env"].end(); ++it) {
+                        if (it.value().is_string()) {
+                            engine.env.emplace_back(it.key(), it.value().get<std::string>());
+                        }
+                    }
+                }
+                engine.valid = !engine.path.empty();
+                if (engine.valid) return engine;
             }
         }
     }
 
-    engine.valid = !engine.path.empty();
+    // 2) A backend installed via POST /install, which lands under
+    //    <downloaded_bin_dir>/llamacpp/<name>/ and is not in config.json.
+    std::error_code ec;
+    std::filesystem::path dir =
+        std::filesystem::path(lemon::utils::get_downloaded_bin_dir()) / "llamacpp" / name;
+#ifdef _WIN32
+    std::filesystem::path exe = dir / "llama-server.exe";
+#else
+    std::filesystem::path exe = dir / "llama-server";
+#endif
+    if (std::filesystem::exists(exe, ec)) {
+        engine.path = lemon::utils::path_to_utf8(exe);
+        downloaded_engine_backend_device(name, engine.backend, engine.device);
+        engine.valid = true;
+    }
     return engine;
 }
 

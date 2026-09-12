@@ -51,6 +51,7 @@ const zh = {
     addCustom: "添加自编引擎",
     addCustomHint: "填自编 llama.cpp 的构建目录（含 llama-server.exe），或直接填 exe 路径",
     added: "已添加引擎",
+    removed: "已卸载引擎",
     installing: "开始下载",
   },
   params: {
@@ -203,6 +204,7 @@ const en: typeof zh = {
     addCustom: "Add custom engine",
     addCustomHint: "Point at a self-built llama.cpp folder (containing llama-server.exe), or the exe itself",
     added: "Engine added",
+    removed: "Engine removed",
     installing: "Downloading",
   },
   params: {

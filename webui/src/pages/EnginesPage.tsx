@@ -94,6 +94,18 @@ export default function EnginesPage() {
     }
   };
 
+  // Downloaded engines are backends installed via POST /install, so they are
+  // removed by uninstalling the backend rather than deleting a config entry.
+  const uninstallEngine = async (id: string) => {
+    try {
+      await api.uninstallBackend("llamacpp", id);
+      notify(`${t("engines.removed")}: ${id}`);
+      load();
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
   const install = async (recipe: string, backend: string) => {
     const key = `${recipe}:${backend}`;
     setBusy(key);
@@ -181,6 +193,11 @@ export default function EnginesPage() {
                           </button>
                           {e.source === "registered" && (
                             <button className="btn sm" onClick={() => removeEngine(e.id)}>
+                              <Trash2 size={14} /> {t("common.delete")}
+                            </button>
+                          )}
+                          {e.source === "downloaded" && (
+                            <button className="btn sm" onClick={() => uninstallEngine(e.id)}>
                               <Trash2 size={14} /> {t("common.delete")}
                             </button>
                           )}

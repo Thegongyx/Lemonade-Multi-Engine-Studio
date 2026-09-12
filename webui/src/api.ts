@@ -17,7 +17,7 @@ export type EngineInfo = {
   path: string;
   backend: string;
   device?: string;
-  source: "registered" | "discovered";
+  source: "registered" | "discovered" | "downloaded";
   variant?: string;
   version?: string;
   exists: boolean;
@@ -149,6 +149,11 @@ export const api = {
     req<Record<string, unknown>>("/install", {
       method: "POST",
       body: JSON.stringify({ recipe, backend, stream: true, subscribe: false }),
+    }),
+  uninstallBackend: (recipe: string, backend: string) =>
+    req<Record<string, unknown>>("/uninstall", {
+      method: "POST",
+      body: JSON.stringify({ recipe, backend }),
     }),
   downloads: () => req<DownloadJob[]>("/downloads"),
   controlDownload: (id: string, action: "pause" | "cancel" | "remove") =>
