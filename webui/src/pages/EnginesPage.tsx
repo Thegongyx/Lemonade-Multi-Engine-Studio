@@ -226,6 +226,7 @@ export default function EnginesPage() {
           {grouped.map(([recipe, rows]) => {
             const open = openGroups.has(recipe);
             const installed = rows.filter((r) => r.state === "installed").length;
+            const updatable = rows.filter((r) => r.state === "update_required").length;
             return (
               <div className="group" key={recipe}>
                 <div className="group-head" onClick={() => toggleGroup(recipe)}>
@@ -234,6 +235,11 @@ export default function EnginesPage() {
                   <span className="tag">
                     {installed}/{rows.length}
                   </span>
+                  {updatable > 0 && (
+                    <span className="tag warn">
+                      {updatable} {t("engines.updatesAvailable")}
+                    </span>
+                  )}
                 </div>
                 {open && (
                   <table>
@@ -252,18 +258,23 @@ export default function EnginesPage() {
                             <td><strong>{b.backend}</strong></td>
                             <td>
                               {b.state === "installed" ? (
-                                <span className="tag ok">installed</span>
+                                <span className="tag ok">{t("engines.stateInstalled")}</span>
+                              ) : b.state === "update_required" ? (
+                                <span className="tag warn">{t("engines.stateUpdate")}</span>
+                              ) : b.state === "installable" ? (
+                                <span className="tag">{t("engines.stateInstallable")}</span>
                               ) : (
-                                <span className="tag">{b.state || "available"}</span>
+                                <span className="tag">{b.state || t("engines.stateInstallable")}</span>
                               )}
                             </td>
                             <td>
                               <button
-                                className="btn sm"
+                                className={`btn sm${b.state === "update_required" ? " primary" : ""}`}
                                 disabled={busy === key}
                                 onClick={() => install(b.recipe, b.backend)}
                               >
-                                <DownloadCloud size={14} /> {t("engines.download")}
+                                <DownloadCloud size={14} />{" "}
+                                {b.state === "update_required" ? t("engines.update") : t("engines.download")}
                               </button>
                             </td>
                           </tr>

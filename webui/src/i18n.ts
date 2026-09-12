@@ -53,6 +53,11 @@ const zh = {
     added: "已添加引擎",
     removed: "已卸载引擎",
     installing: "开始下载",
+    stateInstalled: "已安装",
+    stateInstallable: "可安装",
+    stateUpdate: "有新版本",
+    update: "更新",
+    updatesAvailable: "个可更新",
   },
   params: {
     title: "参数目录",
@@ -235,6 +240,11 @@ const en: typeof zh = {
     added: "Engine added",
     removed: "Engine removed",
     installing: "Downloading",
+    stateInstalled: "installed",
+    stateInstallable: "installable",
+    stateUpdate: "update available",
+    update: "Update",
+    updatesAvailable: "updates",
   },
   params: {
     title: "Parameter catalog",
