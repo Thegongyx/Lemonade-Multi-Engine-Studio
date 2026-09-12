@@ -223,3 +223,9 @@ CLAUDE.local.md
 # Node deps + TS incremental build artifacts (must not be committed)
 node_modules/
 *.tsbuildinfo
+
+# Launcher build artifacts (keep only the sources)
+launcher/*.obj
+launcher/*.res
+launcher/*.exe
+launcher/*.pdb
