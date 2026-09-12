@@ -73,9 +73,12 @@ function apiKey(): string {
 }
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
+  // /internal/* endpoints are registered at the server root (not quad-prefixed),
+  // so they must bypass the /api/v1 prefix.
+  const url = path.startsWith("/internal") ? path : `/api/v1${path}`;
   let res: Response;
   try {
-    res = await fetch(`/api/v1${path}`, {
+    res = await fetch(url, {
       ...init,
       headers: {
         "Content-Type": "application/json",
@@ -173,4 +176,11 @@ export const api = {
     req<{ lines: { timestamp: string; severity: string; tag: string; line: string }[] }>(
       `/logs?tail=${tail}${q ? `&q=${encodeURIComponent(q)}` : ""}`,
     ),
+  // Global runtime configuration. These live at the server root (not quad-prefixed):
+  // GET /internal/config (effective snapshot), POST /internal/set (apply+persist),
+  // GET /internal/config/defaults (shipped defaults).
+  config: () => req<Record<string, unknown>>("/internal/config"),
+  configDefaults: () => req<Record<string, unknown>>("/internal/config/defaults"),
+  setConfig: (changes: Record<string, unknown>) =>
+    req<Record<string, unknown>>("/internal/set", { method: "POST", body: JSON.stringify(changes) }),
 };

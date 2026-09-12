@@ -16,7 +16,42 @@
 #define ID_QUIT 1002
 #define ID_ICON 1
 
-static const int PORT = 13310;
+static const int DEFAULT_PORT = 13310;
+
+// The listening port comes from config/config.json so the value set in the WebUI
+// ("Runtime settings") is honoured. Only when the file or key is missing do we
+// fall back to the default. Parsed with a tiny scanner to keep the launcher
+// dependency-free.
+static int ReadConfigPort(const std::wstring& dir) {
+    const std::wstring path = dir + L"\\config\\config.json";
+    HANDLE f = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                           nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (f == INVALID_HANDLE_VALUE) return DEFAULT_PORT;
+
+    std::string buf;
+    char chunk[4096];
+    DWORD read = 0;
+    while (buf.size() < 256 * 1024 && ReadFile(f, chunk, sizeof(chunk), &read, nullptr) && read > 0) {
+        buf.append(chunk, read);
+    }
+    CloseHandle(f);
+
+    // "\"port\"" cannot match "websocket_port" because of the leading quote.
+    const size_t key = buf.find("\"port\"");
+    if (key == std::string::npos) return DEFAULT_PORT;
+    size_t i = buf.find(':', key);
+    if (i == std::string::npos) return DEFAULT_PORT;
+    ++i;
+    while (i < buf.size() && (buf[i] == ' ' || buf[i] == '\t' || buf[i] == '\r' || buf[i] == '\n')) ++i;
+    int value = 0;
+    bool any = false;
+    while (i < buf.size() && buf[i] >= '0' && buf[i] <= '9') {
+        value = value * 10 + (buf[i] - '0');
+        any = true;
+        ++i;
+    }
+    return (any && value > 0 && value < 65536) ? value : DEFAULT_PORT;
+}
 
 static PROCESS_INFORMATION g_pi{};
 static NOTIFYICONDATAW g_nid{};
@@ -30,8 +65,8 @@ static std::wstring ExeDir() {
     return pos == std::wstring::npos ? p : p.substr(0, pos);
 }
 
-static std::wstring WebUrl() {
-    return L"http://localhost:" + std::to_wstring(PORT) + L"/app/";
+static std::wstring WebUrl(const std::wstring& dir) {
+    return L"http://localhost:" + std::to_wstring(ReadConfigPort(dir)) + L"/app/";
 }
 
 // The repo root is where build/Release/lemond.exe lives. The launcher may sit
@@ -88,7 +123,7 @@ static void EnsureShortcuts() {
 }
 
 static void OpenWebUI() {
-    const std::wstring url = WebUrl();
+    const std::wstring url = WebUrl(FindRoot());
     ShellExecuteW(nullptr, L"open", url.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
 }
 
@@ -108,7 +143,7 @@ static void StartBackend() {
     CreateDirectoryW((dir + L"\\data\\cache").c_str(), nullptr);
 
     std::wstring cmd = L"\"" + lemond + L"\" \"" + dir + L"\\data\\cache\" \"" +
-                       dir + L"\\config\" --port " + std::to_wstring(PORT);
+                       dir + L"\\config\" --port " + std::to_wstring(ReadConfigPort(dir));
 
     STARTUPINFOW si{};
     si.cb = sizeof(si);
