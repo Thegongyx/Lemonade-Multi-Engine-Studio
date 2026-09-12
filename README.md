@@ -109,6 +109,17 @@
 
 产物：`dist\LemonadeMultiEngineStudio\`（文件夹）与 `dist\LemonadeMultiEngineStudio.zip`。
 
+**单独打包引擎**（每个引擎一个 zip，用于 Release 分发）：
+
+```powershell
+.\scripts\package-engines.ps1                       # 打包 engines/ 下全部引擎
+.\scripts\package-engines.ps1 -Only roc_official    # 只打包指定引擎
+```
+
+产物：`dist\engines\engine-<引擎名>_gfx1151_win.zip`。
+**每个 zip 内已含顶层 `<引擎名>/` 目录**，所以解压到 `engines\` 后天然得到
+`engines\<引擎名>\llama-server.exe`（引擎扫描器要求的层级）。
+
 **做成真正的安装程序**（需 Inno Setup 6：`winget install --exact --id JRSoftware.InnoSetup`）：
 
 ```powershell

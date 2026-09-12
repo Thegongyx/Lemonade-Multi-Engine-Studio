@@ -1209,9 +1209,26 @@ void ModelManager::set_extra_models_dirs(const std::vector<std::string>& dirs) {
 }
 
 std::vector<std::string> ModelManager::extra_models_dirs() const {
-    if (!extra_models_dirs_.empty()) return extra_models_dirs_;
-    if (!extra_models_dir_.empty()) return {extra_models_dir_};
-    return {};
+    std::vector<std::string> dirs;
+    if (!extra_models_dirs_.empty()) {
+        dirs = extra_models_dirs_;
+    } else if (!extra_models_dir_.empty()) {
+        dirs.push_back(extra_models_dir_);
+    }
+    // In-app downloads land in the HF cache. Always scan it so a downloaded
+    // model shows up without the user adding a local path by hand.
+    const std::string default_dir = lemon::utils::get_hf_cache_dir();
+    bool present = false;
+    for (const auto& d : dirs) {
+        if (d == default_dir) {
+            present = true;
+            break;
+        }
+    }
+    if (!default_dir.empty() && !present) {
+        dirs.push_back(default_dir);
+    }
+    return dirs;
 }
 
 ModelManager::~ModelManager() {
@@ -1281,10 +1298,7 @@ static const std::set<std::string>& reserved_extra_model_ids() {
 std::map<std::string, ModelInfo> ModelManager::discover_extra_models() const {
     std::map<std::string, ModelInfo> discovered;
 
-    std::vector<std::string> roots = extra_models_dirs_;
-    if (roots.empty() && !extra_models_dir_.empty()) {
-        roots.push_back(extra_models_dir_);
-    }
+    std::vector<std::string> roots = extra_models_dirs();
     for (const auto& root : roots) {
         if (root.empty()) continue;
         fs::path search_path = path_from_utf8(root).lexically_normal();

@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { RefreshCw, ListTree, DownloadCloud, FolderPlus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 import { api, type EngineInfo } from "../api";
 import ParamsModal from "../components/ParamsModal";
+import DownloadProgress from "../components/DownloadProgress";
 
 type BackendRow = { recipe: string; backend: string; state: string };
 
@@ -100,7 +101,6 @@ export default function EnginesPage() {
     try {
       await api.installBackend(recipe, backend);
       notify(`${t("engines.installing")}: ${key}`);
-      load();
     } catch (e) {
       setError(String(e));
     } finally {
@@ -194,6 +194,8 @@ export default function EnginesPage() {
           </div>
         </>
       )}
+
+      {tab === "download" && <DownloadProgress type="backend" onFinished={load} />}
 
       {tab === "download" && (
         <div className="card">

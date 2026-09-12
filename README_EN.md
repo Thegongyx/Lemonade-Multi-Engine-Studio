@@ -122,6 +122,17 @@ Left navigation order: **Models → Chat → Engines → Runtime**.
 
 Outputs: `dist\LemonadeMultiEngineStudio\` (folder) and `dist\LemonadeMultiEngineStudio.zip`.
 
+**Package engines separately** (one zip per engine, for Release distribution):
+
+```powershell
+.\scripts\package-engines.ps1                       # all engines under engines/
+.\scripts\package-engines.ps1 -Only roc_official    # a single engine
+```
+
+Output: `dist\engines\engine-<name>_gfx1151_win.zip`.
+**Each archive already contains a top-level `<name>/` folder**, so extracting it into
+`engines\` yields `engines\<name>\llama-server.exe` — the layout the engine scanner expects.
+
 **Build a real installer** (requires Inno Setup 6:
 `winget install --exact --id JRSoftware.InnoSetup`):
 

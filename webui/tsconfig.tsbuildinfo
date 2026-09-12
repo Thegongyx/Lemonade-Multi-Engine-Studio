@@ -1,1 +1,0 @@
-{"root":["./src/app.tsx","./src/api.ts","./src/i18n.ts","./src/main.tsx","./src/components/logsmodal.tsx","./src/components/modelconfigmodal.tsx","./src/components/modeldownload.tsx","./src/components/paramsmodal.tsx","./src/pages/chatpage.tsx","./src/pages/enginespage.tsx","./src/pages/modelspage.tsx","./src/pages/runtimepage.tsx"],"version":"5.9.3"}

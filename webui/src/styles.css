@@ -178,3 +178,15 @@ tr:hover td { background: var(--bg-elev-2); }
 .sev-info { color: var(--text); }
 .sev-debug, .sev-trace { color: #6b7686; }
 
+
+/* Download manager (server-backed, survives reload) */
+.dl-list { display: flex; flex-direction: column; gap: 8px; }
+.dl-item { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; background: var(--bg-elev-2); }
+.dl-head { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+.dl-name { font-weight: 600; }
+.dl-meta { font-size: 11px; color: var(--text-dim); margin-top: 6px; word-break: break-all; }
+.progress { height: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 999px; overflow: hidden; margin-top: 8px; }
+.progress-fill { height: 100%; background: var(--accent); transition: width .3s ease; }
+.progress-fill.paused { background: var(--warn); }
+.progress-fill.err { background: var(--err); }
+.progress-fill.ok { background: var(--ok); }

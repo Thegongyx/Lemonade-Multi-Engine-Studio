@@ -2,6 +2,7 @@ import { Fragment, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Search, DownloadCloud, ChevronDown, ChevronRight } from "lucide-react";
 import { api } from "../api";
+import DownloadProgress from "./DownloadProgress";
 
 type Source = "huggingface" | "modelscope";
 
@@ -68,7 +69,6 @@ export default function ModelDownload({ onPulled }: { onPulled?: () => void }) {
     try {
       await api.pull({ model: name, checkpoint: `${repo}:${variantName}`, source, recipe: variants?.recipe || "llamacpp" });
       notify(t("download.pulled"));
-      onPulled?.();
     } catch (e) {
       setError(String(e));
     } finally {
@@ -78,6 +78,7 @@ export default function ModelDownload({ onPulled }: { onPulled?: () => void }) {
 
   return (
     <div>
+      <DownloadProgress type="model" onFinished={onPulled} />
       <div className="row" style={{ marginBottom: 8 }}>
         <select value={source} onChange={(e) => setSource(e.target.value as Source)} style={{ width: 200 }}>
           <option value="huggingface">HuggingFace（hf-mirror）</option>

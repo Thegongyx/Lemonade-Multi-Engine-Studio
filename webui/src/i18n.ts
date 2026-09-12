@@ -78,6 +78,20 @@ const zh = {
     pulled: "已加入下载",
     hint: "输入至少 3 个字符搜索模型",
   },
+  dl: {
+    title: "下载任务",
+    pause: "暂停",
+    cancel: "取消",
+    remove: "移除",
+    files: "第 {{done}}/{{total}} 个文件",
+    status: {
+      downloading: "下载中",
+      paused: "已暂停",
+      completed: "已完成",
+      cancelled: "已取消",
+      error: "失败",
+    },
+  },
   models: {
     title: "模型管理",
     desc: "扫描本地路径中的模型，为每个模型选择引擎构建、配置参数并启动",
@@ -215,6 +229,20 @@ const en: typeof zh = {
     pulling: "Downloading…",
     pulled: "Added to downloads",
     hint: "Type at least 3 characters to search",
+  },
+  dl: {
+    title: "Downloads",
+    pause: "Pause",
+    cancel: "Cancel",
+    remove: "Remove",
+    files: "file {{done}}/{{total}}",
+    status: {
+      downloading: "downloading",
+      paused: "paused",
+      completed: "completed",
+      cancelled: "cancelled",
+      error: "error",
+    },
   },
   models: {
     title: "Models",

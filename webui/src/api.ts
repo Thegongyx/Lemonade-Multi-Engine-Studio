@@ -42,6 +42,29 @@ export type ModelInfo = {
   recipe_options?: Record<string, unknown>;
 };
 
+// Server-owned download job (GET /downloads). Lives in the server, so a page
+// reload re-reads the same in-flight state instead of showing "not downloaded".
+export type DownloadJob = {
+  id: string;
+  type: string;
+  model_name: string;
+  status: "downloading" | "paused" | "completed" | "cancelled" | "error" | string;
+  running: boolean;
+  file?: string;
+  file_index?: number;
+  total_files?: number;
+  bytes_downloaded?: number;
+  bytes_total?: number;
+  total_download_size?: number;
+  bytes_previously_downloaded?: number;
+  completed_files_bytes?: number;
+  cumulative_bytes_downloaded?: number;
+  overall_bytes_downloaded?: number;
+  percent?: number;
+  complete?: boolean;
+  error?: string;
+};
+
 // API key for the local service. Defaults to "lemonade" (the default in
 // config.json); override in the browser console with:
 //   localStorage.setItem("apiKey", "...")
@@ -91,8 +114,14 @@ export const api = {
     }),
   unloadModel: (id?: string) =>
     req<{ status: string }>("/unload", { method: "POST", body: JSON.stringify({ model: id ?? "" }) }),
+  // Server-owned mode (stream + subscribe:false): the call returns as soon as
+  // the background job is registered, so the download keeps running server-side
+  // and progress survives a page reload (read it back from GET /downloads).
   pull: (body: Record<string, unknown>) =>
-    req<{ status: string }>("/pull", { method: "POST", body: JSON.stringify(body) }),
+    req<Record<string, unknown>>("/pull", {
+      method: "POST",
+      body: JSON.stringify({ ...body, stream: true, subscribe: false }),
+    }),
   registrySearch: (source: string, query: string, limit = 20) =>
     req<{ results: unknown[] }>(
       `/registry/search?source=${encodeURIComponent(source)}&query=${encodeURIComponent(query)}&limit=${limit}&format=gguf`,
@@ -119,7 +148,13 @@ export const api = {
   installBackend: (recipe: string, backend: string) =>
     req<Record<string, unknown>>("/install", {
       method: "POST",
-      body: JSON.stringify({ recipe, backend }),
+      body: JSON.stringify({ recipe, backend, stream: true, subscribe: false }),
+    }),
+  downloads: () => req<DownloadJob[]>("/downloads"),
+  controlDownload: (id: string, action: "pause" | "cancel" | "remove") =>
+    req<Record<string, unknown>>("/downloads/control", {
+      method: "POST",
+      body: JSON.stringify({ id, action }),
     }),
   health: () =>
     req<{

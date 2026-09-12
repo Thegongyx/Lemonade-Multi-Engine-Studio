@@ -219,3 +219,7 @@ CLAUDE.local.md
 
 # Local per-model saved options (machine-specific; auto-generated when saving model params)
 /config/recipe_options.json
+
+# Node deps + TS incremental build artifacts (must not be committed)
+node_modules/
+*.tsbuildinfo

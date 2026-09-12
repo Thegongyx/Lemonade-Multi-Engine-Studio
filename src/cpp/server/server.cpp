@@ -6930,7 +6930,9 @@ nlohmann::json parse_llamacpp_help(const std::string& help) {
 }
 
 // Resolve an engine id to its executable: the registered custom_engines map
-// first, then a subdirectory of engines_dir.
+// first, then a subdirectory of engines_dir, then a backend installed through
+// the download flow (POST /install), which lands under
+// <downloaded_bin_dir>/llamacpp/<id>/ without being registered in config.
 std::string resolve_engine_exe(const std::string& id, const nlohmann::json& section) {
     if (section.contains("custom_engines") && section["custom_engines"].is_object() &&
         section["custom_engines"].contains(id)) {
@@ -6940,6 +6942,17 @@ std::string resolve_engine_exe(const std::string& id, const nlohmann::json& sect
         std::error_code ec;
         std::filesystem::path dir =
             lemon::utils::path_from_utf8(section["engines_dir"].get<std::string>()) / id;
+#ifdef _WIN32
+        std::filesystem::path exe = dir / "llama-server.exe";
+#else
+        std::filesystem::path exe = dir / "llama-server";
+#endif
+        if (std::filesystem::exists(exe, ec)) return lemon::utils::path_to_utf8(exe);
+    }
+    {
+        std::error_code ec;
+        std::filesystem::path dir =
+            std::filesystem::path(lemon::utils::get_downloaded_bin_dir()) / "llamacpp" / id;
 #ifdef _WIN32
         std::filesystem::path exe = dir / "llama-server.exe";
 #else
@@ -7002,6 +7015,42 @@ void Server::handle_engines(const httplib::Request& req, httplib::Response& res)
                                        {"backend", ""},
                                        {"device", ""},
                                        {"source", "discovered"},
+                                       {"exists", true}});
+                }
+            }
+        }
+
+        // Backends installed via POST /install land under
+        // <downloaded_bin_dir>/llamacpp/<name>/ and are not registered in
+        // config; surface them so a WebUI download shows up without manual work.
+        {
+            std::error_code ec;
+            std::filesystem::path root =
+                std::filesystem::path(lemon::utils::get_downloaded_bin_dir()) / "llamacpp";
+            if (std::filesystem::is_directory(root, ec)) {
+                for (const auto& entry : std::filesystem::directory_iterator(root, ec)) {
+                    if (!entry.is_directory()) continue;
+#ifdef _WIN32
+                    std::filesystem::path exe = entry.path() / "llama-server.exe";
+#else
+                    std::filesystem::path exe = entry.path() / "llama-server";
+#endif
+                    if (!std::filesystem::exists(exe, ec)) continue;
+                    const std::string id = lemon::utils::path_to_utf8(entry.path().filename());
+                    bool duplicate = false;
+                    for (const auto& existing : engines) {
+                        if (existing.value("id", std::string("")) == id) { duplicate = true; break; }
+                    }
+                    if (duplicate) continue;
+                    // "rocm-stable" -> "rocm"; a bare "cpu" stays "cpu".
+                    const std::size_t dash = id.find('-');
+                    const std::string backend = dash == std::string::npos ? id : id.substr(0, dash);
+                    engines.push_back({{"id", id},
+                                       {"name", id},
+                                       {"path", lemon::utils::path_to_utf8(exe)},
+                                       {"backend", backend},
+                                       {"device", ""},
+                                       {"source", "downloaded"},
                                        {"exists", true}});
                 }
             }
