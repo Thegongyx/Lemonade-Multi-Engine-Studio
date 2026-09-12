@@ -472,6 +472,21 @@ void LlamaCppServer::load(const std::string& model_name,
             "': not found in config.json llamacpp.custom_engines");
     }
 
+    // A registered engine whose binary is missing (e.g. a packaged config lists
+    // engines this install never received) must fail with an actionable message
+    // rather than the OS-level "cannot find the file" from CreateProcess.
+    if (custom_engine.valid) {
+        std::error_code ec;
+        if (!std::filesystem::exists(lemon::utils::path_from_utf8(custom_engine.path), ec)) {
+            throw std::invalid_argument(
+                "llama.cpp engine '" + llamacpp_engine + "' is not installed: '" +
+                custom_engine.path +
+                "' was not found. Download engine-*_gfx1151_win.zip from the GitHub Releases "
+                "page and extract it into the app's engines folder, or pick another engine "
+                "for this model.");
+        }
+    }
+
     if (custom_engine.valid && !custom_engine.backend.empty()) {
         llamacpp_backend_option = custom_engine.backend;
     }

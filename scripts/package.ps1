@@ -31,14 +31,15 @@ if (Test-Path $cfgPath) {
     $cfg = Get-Content $cfgPath -Raw | ConvertFrom-Json
     $cfg.PSObject.Properties.Remove("extra_models_dirs")
     $cfg.PSObject.Properties.Remove("extra_models_dir")
-    if ($cfg.llamacpp) {
-        $cfg.llamacpp.engines_dir = "engines"
-        if ($cfg.llamacpp.custom_engines) {
-            foreach ($e in $cfg.llamacpp.custom_engines.PSObject.Properties) {
-                $e.Value.path = "engines\$($e.Name)\llama-server.exe"
-            }
-        }
-    }
+if ($cfg.llamacpp) {
+    $cfg.llamacpp.engines_dir = "engines"
+    # Engines are auto-discovered by scanning engines_dir, so shipping the
+    # developer's custom_engines map only creates registrations whose binaries are
+    # absent from the package (the installer deliberately does not bundle the
+    # ~1 GB of engines) -- those phantom entries then fail every model pinned to
+    # them. Drop the map and let discovery populate the list instead.
+    $cfg.llamacpp.PSObject.Properties.Remove("custom_engines")
+}
     $cfg | ConvertTo-Json -Depth 8 | Set-Content $cfgPath -Encoding UTF8
 }
 Remove-Item (Join-Path $out "config\recipe_options.json") -Force -ErrorAction SilentlyContinue
