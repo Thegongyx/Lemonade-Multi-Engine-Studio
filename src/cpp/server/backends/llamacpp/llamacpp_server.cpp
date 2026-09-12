@@ -263,7 +263,12 @@ static CustomEngine resolve_custom_engine(const std::string& name) {
 #endif
     if (std::filesystem::exists(exe, ec)) {
         engine.path = lemon::utils::path_to_utf8(exe);
-        downloaded_engine_backend_device(name, engine.backend, engine.device);
+        // Derive the backend, but deliberately leave the device unset: these are
+        // official builds that already select their own device, and forcing one
+        // makes llama-server abort with "invalid device: <name>" in some
+        // environments (observed with rocm-stable + --device ROCm0).
+        std::string ignored_device;
+        downloaded_engine_backend_device(name, engine.backend, ignored_device);
         engine.valid = true;
     }
     return engine;
