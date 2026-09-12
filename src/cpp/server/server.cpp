@@ -7236,6 +7236,7 @@ void Server::handle_model_paths_post(const httplib::Request& req, httplib::Respo
 
 void Server::handle_logs(const httplib::Request& req, httplib::Response& res) {
     if (req.method == "HEAD") { res.status = 200; return; }
+    try {
     size_t tail = 200;
     if (req.has_param("tail")) {
         try {
@@ -7266,6 +7267,11 @@ void Server::handle_logs(const httplib::Request& req, httplib::Response& res) {
                          {"line", entry.line}});
     }
     res.set_content(nlohmann::json{{"lines", lines}}.dump(), "application/json");
+    } catch (const std::exception& e) {
+        LOG(ERROR, "Server") << "ERROR in handle_logs: " << e.what() << std::endl;
+        res.status = 500;
+        res.set_content(nlohmann::json{{"error", e.what()}}.dump(), "application/json");
+    }
 }
 
 void Server::handle_system_info(const httplib::Request& req, httplib::Response& res) {
