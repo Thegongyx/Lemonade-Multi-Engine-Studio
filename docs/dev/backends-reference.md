@@ -12,6 +12,7 @@ the generator instead. Prose outside the markers is preserved. -->
 | `acestep` | ACE-Step | yes | no | cuda, rocm, vulkan |
 | `ds4` | DwarfStar4 (experimental) | no | yes | rocm |
 | `flm` | FastFlowLM NPU | no | yes | npu |
+| `halowin` | HaloWin (gfx1151) | no | yes | win |
 | `kokoro` | Kokoro | no | no | cpu, metal |
 | `llamacpp` | Llama.cpp GPU | yes | yes | cpu, cuda, metal, rocm, system, vulkan |
 | `llamacpp-hrx` | HRX GPU (experimental) | no | yes | hrx |
@@ -37,6 +38,7 @@ the generator instead. Prose outside the markers is preserved. -->
 | `acestep` | rocm | linux, windows | amd_gpu (gfx103X, gfx110X, gfx1150, gfx1151, gfx1152, gfx120X) |
 | `ds4` | rocm | linux | amd_gpu (gfx1151) |
 | `flm` | npu | linux, windows | amd_npu (XDNA2) |
+| `halowin` | win | windows | amd_gpu (gfx1151) |
 | `kokoro` | metal | macos | metal |
 | `kokoro` | cpu | linux, windows | cpu (x86_64) |
 | `llamacpp` | system | linux | cpu (arm64, x86_64) |
@@ -106,11 +108,22 @@ the generator instead. Prose outside the markers is preserved. -->
 | `ctx_size` | `--ctx-size` | SIZE | -1 | Context size for the model |
 | `flm_args` | `--flm-args` | ARGS | "" | Safe flm serve tuning args: --pmode, --prefill-chunk-len, --img-pre-resize, --socket, --q-len, --preemption |
 
+#### `halowin` — HaloWin (gfx1151)
+
+| Option | CLI flag | Type | Default | Description |
+|--------|----------|------|---------|-------------|
+| `ctx_size` | `--ctx-size` | SIZE | -1 | Context size for the model |
+| `halowin_args` | `--halowin-args` | ARGS | "" | Extra arguments passed to the gdec-api OpenAI front-end |
+| `halowin_engine_args` | `--halowin-engine-args` | ARGS | "" | Extra arguments passed to the gdec engine |
+| `halowin_bin_dir` | `--halowin-bin-dir` | STRING | "" | Directory containing gdec and gdec-api; overrides the installed engine |
+| `halowin_models_dir` | `--halowin-models-dir` | STRING | "" | Directory scanned for .hgn model sets |
+
 #### `llamacpp` — Llama.cpp GPU
 
 | Option | CLI flag | Type | Default | Description |
 |--------|----------|------|---------|-------------|
 | `ctx_size` | `--ctx-size` | SIZE | -1 | Context size for the model |
+| `llamacpp_engine` | `--llamacpp-engine` | STRING | "" | Named custom llama.cpp engine build (config.json llamacpp.custom_engines); overrides llamacpp_backend and the binary path |
 | `llamacpp_backend` | `--llamacpp` | BACKEND | "" | LlamaCpp backend to use |
 | `llamacpp_device` | `--llamacpp-device` | DEVICES | "" | Comma-separated list of accelerator devices to use (e.g. Vulkan0) |
 | `llamacpp_args` | `--llamacpp-args` | ARGS | "" | Custom arguments to pass to llama-server |

@@ -148,6 +148,9 @@
   "flm": {
     "npu": "v1.0.5"
   },
+  "halowin": {
+    "win": "v0.0.1"
+  },
   "kokoro": {
     "cpu": "b17",
     "metal": "b17"

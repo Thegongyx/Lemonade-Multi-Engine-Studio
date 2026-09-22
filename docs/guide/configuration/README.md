@@ -66,6 +66,13 @@ When `lemond` starts, effective configuration is resolved by deep-merging settin
     "prefer_system": false
   },
   "global_timeout": 600,
+  "halowin": {
+    "halowin_args": "",
+    "halowin_bin_dir": "",
+    "halowin_engine_args": "",
+    "halowin_models_dir": "",
+    "win_bin": "builtin"
+  },
   "host": "localhost",
   "hrx": {
     "args": "",
@@ -81,6 +88,8 @@ When `lemond` starts, effective configuration is resolved by deep-merging settin
     "cpu_args": "",
     "cpu_bin": "builtin",
     "cuda_bin": "builtin",
+    "custom_engines": {},
+    "engines_dir": "",
     "prefer_system": true,
     "rocm_args": "",
     "rocm_bin": "builtin",
@@ -91,7 +100,7 @@ When `lemond` starts, effective configuration is resolved by deep-merging settin
   "log_level": "info",
   "log_max_file_size_mb": 10,
   "log_max_files": 5,
-  "max_loaded_models": 1,
+  "max_loaded_models": 3,
   "models_dir": "auto",
   "moonshine": {
     "args": "",

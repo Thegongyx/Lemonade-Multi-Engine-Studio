@@ -378,6 +378,7 @@ The following options are available depending on the recipe being used:
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--ctx-size SIZE` | Context size for the model | auto |
+| `--llamacpp-engine STRING` | Named custom llama.cpp engine build (config.json llamacpp.custom_engines); overrides llamacpp_backend and the binary path | `""` |
 | `--llamacpp BACKEND` | LlamaCpp backend to use | Auto-detected |
 | `--llamacpp-device DEVICES` | Comma-separated list of accelerator devices to use (e.g. Vulkan0) | `""` |
 | `--llamacpp-args ARGS` | Custom arguments to pass to llama-server | `""` |
@@ -473,6 +474,16 @@ The following options are available depending on the recipe being used:
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--openmoss BACKEND` | OpenMOSS TTS backend to use | Auto-detected |
+
+#### HaloWin (gfx1151) (`halowin` recipe)
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--ctx-size SIZE` | Context size for the model | auto |
+| `--halowin-args ARGS` | Extra arguments passed to the gdec-api OpenAI front-end | `""` |
+| `--halowin-engine-args ARGS` | Extra arguments passed to the gdec engine | `""` |
+| `--halowin-bin-dir STRING` | Directory containing gdec and gdec-api; overrides the installed engine | `""` |
+| `--halowin-models-dir STRING` | Directory scanned for .hgn model sets | `""` |
 <!-- END GENERATED: cli-recipe-options -->
 **Notes:**
 - Unspecified options will use the backend's default values

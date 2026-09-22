@@ -28,6 +28,13 @@
     "prefer_system": false
   },
   "global_timeout": 600,
+  "halowin": {
+    "halowin_args": "",
+    "halowin_bin_dir": "",
+    "halowin_engine_args": "",
+    "halowin_models_dir": "",
+    "win_bin": "builtin"
+  },
   "host": "localhost",
   "hrx": {
     "args": "",
@@ -43,6 +50,8 @@
     "cpu_args": "",
     "cpu_bin": "builtin",
     "cuda_bin": "builtin",
+    "custom_engines": {},
+    "engines_dir": "",
     "prefer_system": true,
     "rocm_args": "",
     "rocm_bin": "builtin",
