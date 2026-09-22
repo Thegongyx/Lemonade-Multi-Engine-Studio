@@ -7009,11 +7009,23 @@ void Server::handle_engines(const httplib::Request& req, httplib::Response& res)
                         if (existing.value("id", std::string("")) == id) { duplicate = true; break; }
                     }
                     if (duplicate) continue;
+                    // Infer backend/device from the engine's own DLLs, same rule as the
+                    // POST /engines add path; a scanned dir otherwise has no backend at all.
+                    std::string backend = "cpu";
+                    std::string device;
+                    if (std::filesystem::exists(entry.path() / "ggml-hip.dll", ec) ||
+                        std::filesystem::exists(entry.path() / "amdhip64_7.dll", ec)) {
+                        backend = "rocm";
+                        device = "ROCm0";
+                    } else if (std::filesystem::exists(entry.path() / "ggml-vulkan.dll", ec)) {
+                        backend = "vulkan";
+                        device = "Vulkan0";
+                    }
                     engines.push_back({{"id", id},
                                        {"name", id},
                                        {"path", lemon::utils::path_to_utf8(exe)},
-                                       {"backend", ""},
-                                       {"device", ""},
+                                       {"backend", backend},
+                                       {"device", device},
                                        {"source", "discovered"},
                                        {"exists", true}});
                 }
@@ -7138,7 +7150,13 @@ void Server::handle_engine_add(const httplib::Request& req, httplib::Response& r
                                 {"backend", backend},
                                 {"device", ""}};
         if (auto* cfg = RuntimeConfig::global()) {
-            cfg->set({{"llamacpp", {{"custom_engines", {{name, entry}}}}}}, nullptr);
+            // RuntimeConfig replaces a backend sub-key wholesale, so send the whole map;
+            // {name: entry} alone would drop every other engine from the in-memory config.
+            nlohmann::json section = cfg->backend_config("llamacpp");
+            nlohmann::json engines = (section.contains("custom_engines") && section["custom_engines"].is_object())
+                                     ? section["custom_engines"] : nlohmann::json::object();
+            engines[name] = entry;
+            cfg->set({{"llamacpp", {{"custom_engines", engines}}}}, nullptr);
         }
         if (!config_dir_.empty()) {
             try {
@@ -7164,8 +7182,13 @@ void Server::handle_engine_delete(const httplib::Request& req, httplib::Response
     try {
         const std::string id = req.matches.size() > 1 ? req.matches[1].str() : "";
         if (auto* cfg = RuntimeConfig::global()) {
-            // A null value removes the entry from the merged config.
-            cfg->set({{"llamacpp", {{"custom_engines", {{id, nullptr}}}}}}, nullptr);
+            // Remove just this entry: RuntimeConfig replaces the whole custom_engines map,
+            // so {id: null} would drop every other engine and leave a null that 500s /engines.
+            nlohmann::json section = cfg->backend_config("llamacpp");
+            nlohmann::json engines = (section.contains("custom_engines") && section["custom_engines"].is_object())
+                                     ? section["custom_engines"] : nlohmann::json::object();
+            engines.erase(id);
+            cfg->set({{"llamacpp", {{"custom_engines", engines}}}}, nullptr);
         }
         if (!config_dir_.empty()) {
             try {
