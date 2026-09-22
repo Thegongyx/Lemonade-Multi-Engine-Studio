@@ -547,13 +547,23 @@ const ModelOptionsModal: React.FC<SettingsModalProps> = ({ isOpen, onCancel, onS
     return (
       <div className="form-section" key={key}>
         <label className="form-label" title={def.description}>{def.label.toLowerCase()}</label>
-        <input
-          type="text"
-          className="form-input"
-          placeholder=""
-          value={value}
-          onChange={(e) => handleStringChange(key, e.target.value)}
-        />
+        {def.multiline ? (
+          <textarea
+            className="form-input"
+            rows={4}
+            placeholder="KEY=VALUE"
+            value={value}
+            onChange={(e) => handleStringChange(key, e.target.value)}
+          />
+        ) : (
+          <input
+            type="text"
+            className="form-input"
+            placeholder=""
+            value={value}
+            onChange={(e) => handleStringChange(key, e.target.value)}
+          />
+        )}
       </div>
     );
   };

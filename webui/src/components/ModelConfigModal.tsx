@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { X, Save, Wand2, FileText, Wrench } from "lucide-react";
 import { api, type EngineInfo, type EngineParam } from "../api";
 import ParamsModal from "./ParamsModal";
+import { defaultEnvFor } from "../engineDefaultEnv";
 
 type BuilderParam = { flag: string; value: string; type: EngineParam["type"] };
 
@@ -21,6 +22,8 @@ export default function ModelConfigModal({
   const [engine, setEngine] = useState("");
   const [mode, setMode] = useState<"text" | "builder">("text");
   const [argsText, setArgsText] = useState("");
+  const [envText, setEnvText] = useState("");
+  const [envDirty, setEnvDirty] = useState(false);
   const [builder, setBuilder] = useState<BuilderParam[]>([]);
   const [ctxSize, setCtxSize] = useState("");
   const [showParams, setShowParams] = useState(false);
@@ -39,8 +42,18 @@ export default function ModelConfigModal({
           saved?: Record<string, unknown>;
         };
         const eff = r.effective ?? r.saved ?? {};
-        setEngine(String(eff.llamacpp_engine ?? ""));
+        const eng = String(eff.llamacpp_engine ?? "");
+        const savedEnv = String(eff.llamacpp_env ?? "");
+        setEngine(eng);
         setArgsText(String(eff.llamacpp_args ?? ""));
+        // A saved env is the user's own value; otherwise prefill the engine's defaults.
+        if (savedEnv.trim() !== "") {
+          setEnvText(savedEnv);
+          setEnvDirty(true);
+        } else {
+          setEnvText(defaultEnvFor(eng));
+          setEnvDirty(false);
+        }
         const cs = Number(eff.ctx_size);
         setCtxSize(Number.isFinite(cs) && cs > 0 ? String(cs) : "");
       })
@@ -70,6 +83,7 @@ export default function ModelConfigModal({
       const payload: Record<string, unknown> = {
         llamacpp_engine: engine,
         llamacpp_args: finalArgs,
+        llamacpp_env: envText,
       };
       // Only send ctx_size when set, so an empty field keeps the global default.
       if (ctxSize.trim() !== "") payload.ctx_size = Number(ctxSize);
@@ -103,7 +117,13 @@ export default function ModelConfigModal({
 
           <label className="field">
             <span>{t("models.engine")}</span>
-            <select value={engine} onChange={(e) => setEngine(e.target.value)}>
+            <select
+              value={engine}
+              onChange={(e) => {
+                setEngine(e.target.value);
+                if (!envDirty) setEnvText(defaultEnvFor(e.target.value));
+              }}
+            >
               <option value="">—</option>
               {engines.map((e) => (
                 <option key={e.id} value={e.id}>
@@ -165,6 +185,19 @@ export default function ModelConfigModal({
               </div>
             </div>
           )}
+
+          <label className="field">
+            <span>{t("models.envText")}</span>
+            <textarea
+              value={envText}
+              onChange={(e) => {
+                setEnvText(e.target.value);
+                setEnvDirty(true);
+              }}
+              placeholder={t("models.envPlaceholder")}
+            />
+            <div className="hint">{t("models.envHint")}</div>
+          </label>
 
           <label className="field">
             <span>{t("models.ctxSize")}</span>

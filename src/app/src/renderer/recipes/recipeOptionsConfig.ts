@@ -36,6 +36,7 @@ export interface LlamaOptions {
   ctxSize: NumericOption;
   llamacppBackend: StringOption;
   llamacppArgs: StringOption;
+  llamacppEnv: StringOption;
   mergeArgs: BooleanOption;
   pinned: BooleanOption;
   saveOptions: BooleanOption;
@@ -164,6 +165,7 @@ export interface StringOptionDef {
   description?: string;
   isBackendOption?: boolean;
   backendRecipe?: string;
+  multiline?: boolean;
 }
 
 export interface BooleanOptionDef {
@@ -213,6 +215,13 @@ export const OPTION_DEFINITIONS: Record<string, OptionDef> = {
     default: '',
     label: 'LlamaCpp Arguments',
     description: 'Custom arguments to pass to llama-server',
+  },
+  llamacppEnv: {
+    type: 'string',
+    default: '',
+    label: 'Environment Variables',
+    description: 'Environment variables for llama-server, one KEY=VALUE per line (or ;-separated)',
+    multiline: true,
   },
 
   // vLLM-specific options
@@ -363,7 +372,7 @@ export type RecipeName = 'llamacpp' | 'whispercpp' | 'moonshine' | 'flm' | 'ryze
  * This mirrors the C++ get_keys_for_recipe() function in recipe_options.cpp
  */
 export const RECIPE_OPTIONS_MAP: Record<RecipeName, string[]> = {
-  'llamacpp': ['ctxSize', 'llamacppBackend', 'llamacppArgs', 'mergeArgs', 'pinned', 'saveOptions'],
+  'llamacpp': ['ctxSize', 'llamacppBackend', 'llamacppArgs', 'llamacppEnv', 'mergeArgs', 'pinned', 'saveOptions'],
   'whispercpp': ['whispercppBackend', 'whispercppArgs', 'mergeArgs', 'pinned', 'saveOptions'],
   'moonshine': ['moonshineArgs', 'mergeArgs', 'pinned', 'saveOptions'],
   'flm': ['ctxSize', 'mergeArgs', 'pinned', 'saveOptions'],
@@ -402,6 +411,7 @@ const FRONTEND_TO_API_MAP: Record<string, string> = {
   mergeArgs: 'merge_args',
   llamacppBackend: 'llamacpp_backend',
   llamacppArgs: 'llamacpp_args',
+  llamacppEnv: 'llamacpp_env',
   whispercppBackend: 'whispercpp_backend',
   whispercppArgs: 'whispercpp_args',
   moonshineArgs: 'moonshine_args',

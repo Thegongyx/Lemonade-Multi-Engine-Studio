@@ -457,6 +457,7 @@ void LlamaCppServer::load(const std::string& model_name,
     std::string llamacpp_device = options.get_option("llamacpp_device");
     std::string llamacpp_backend_option = options.get_option("llamacpp_backend");
     std::string llamacpp_args = options.get_option("llamacpp_args");
+    std::string llamacpp_env = options.get_option("llamacpp_env");
 
     // Per-model custom engine: a named build from config.json's
     // llamacpp.custom_engines. When set it overrides both the backend choice and
@@ -810,6 +811,36 @@ void LlamaCppServer::load(const std::string& model_name,
         for (const auto& kv : custom_engine.env) {
             env_vars.push_back(kv);
         }
+    }
+
+    // Per-model environment variables from the llamacpp_env option (KEY=VALUE per line or
+    // ';'-separated). Applied after the engine's env so a model can override the engine.
+    if (!llamacpp_env.empty()) {
+        std::string entry;
+        auto flush_entry = [&]() {
+            const size_t eq = entry.find('=');
+            if (eq != std::string::npos && eq > 0) {
+                auto trim = [](std::string s) {
+                    const size_t b = s.find_first_not_of(" \t\r\n");
+                    const size_t e = s.find_last_not_of(" \t\r\n");
+                    return (b == std::string::npos) ? std::string() : s.substr(b, e - b + 1);
+                };
+                std::string key = trim(entry.substr(0, eq));
+                std::string val = trim(entry.substr(eq + 1));
+                if (!key.empty()) {
+                    env_vars.push_back({key, val});
+                }
+            }
+            entry.clear();
+        };
+        for (char c : llamacpp_env) {
+            if (c == '\n' || c == ';') {
+                flush_entry();
+            } else {
+                entry.push_back(c);
+            }
+        }
+        flush_entry();
     }
 
     // Start process (inherit output if debug logging enabled, filter health check spam)
