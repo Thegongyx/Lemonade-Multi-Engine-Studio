@@ -251,6 +251,15 @@ The engines come from [ROCmFPX/ROCmFPX](https://github.com/ROCmFPX/ROCmFPX) and 
 built locally. Thanks to [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp) and the AMD
 ROCm community.
 
+**The Strix engines** (`roc_strixllama` / `roc_strixllama_env`, see
+`llamacpp-win-gfx1151-integration`) come from
+[rulith-dev/strixllama](https://github.com/rulith-dev/strixllama) (MIT): a ~30-file patch set on top
+of [pwilkin/llama.cpp](https://github.com/pwilkin/llama.cpp) (MIT, pinned at `f5daaa3`), covering
+Qwen3.8-Flash-Next (qwen4exp) QSA sparse attention (decode gather, block-key cache),
+IQ3_S/IQ4_XS matrix-core kernels, MTP speculation tuning and shape-keyed HIP graphs. This fork
+builds both engines from it, and injects compile-time default environment variables into
+`roc_strixllama_env` (the gate set, still overridable at runtime). Thanks to rulith-dev and pwilkin.
+
 ## 📄 License
 
 Inherits Lemonade's MIT License (see `LICENSE`).
