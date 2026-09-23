@@ -225,6 +225,14 @@ cmake --build build --config Release --target lemond
 引擎来自 [ROCmFPX/ROCmFPX](https://github.com/ROCmFPX/ROCmFPX) 及各社区 fork 的本地编译产物，
 感谢 [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp) 与 AMD ROCm 社区。
 
+**Strix 系列引擎**（`roc_strixllama` / `roc_strixllama_env`，见 `llamacpp-win-gfx1151-integration`）
+来自 [rulith-dev/strixllama](https://github.com/rulith-dev/strixllama)（MIT）：它是在
+[pwilkin/llama.cpp](https://github.com/pwilkin/llama.cpp)（MIT，pin `f5daaa3`）之上的约 30 文件补丁集，
+包含 Qwen3.8-Flash-Next（qwen4exp）的 QSA 稀疏注意力（decode gather、block-key cache）、
+IQ3_S/IQ4_XS 矩阵核、MTP 投机调优与按 shape 的 HIP graph 等。
+本仓库据其编译出上述两个引擎，并为 `roc_strixllama_env` 注入了编译期默认环境变量
+（那套 gate，运行时 env 仍可覆盖）。感谢 rulith-dev 与 pwilkin 的工作。
+
 ## 📄 License
 
 继承 lemonade 的 MIT License（见 `LICENSE`）。
