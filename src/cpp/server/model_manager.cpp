@@ -1315,6 +1315,13 @@ std::map<std::string, ModelInfo> ModelManager::discover_extra_models() const {
     return discovered;
 }
 
+// MTP / DFlash draft files sit beside the model, like an mmproj: they are companions,
+// not models of their own. Publishers name them mtp-*.gguf / *dflash*.gguf.
+static bool is_draft_gguf_filename(const std::string& filename) {
+    return gguf_reader_detail::starts_with_ignore_case(filename, "mtp-") ||
+           gguf_reader_detail::contains_ignore_case(filename, "dflash");
+}
+
 void ModelManager::discover_extra_models_in_root(
     const fs::path& search_path,
     std::map<std::string, ModelInfo>& discovered) const {
@@ -1386,7 +1393,8 @@ void ModelManager::discover_extra_models_in_root(
     std::set<std::string> folder_ids_kept;
     auto add_standalone_model = [&](const std::vector<fs::path>& model_files,
                                     const std::string& deployment_label,
-                                    const fs::path& mmproj_file = fs::path()) {
+                                    const fs::path& mmproj_file = fs::path(),
+                                    const fs::path& draft_file = fs::path()) {
         const fs::path& gguf_path = model_files.front();
         std::string filename = gguf_path.filename().string();
         std::string shard_base;
@@ -1417,6 +1425,12 @@ void ModelManager::discover_extra_models_in_root(
             info.labels.push_back("vision");
         }
 
+        if (!draft_file.empty()) {
+            info.checkpoints["draft"] = draft_file.filename().string();
+            info.resolved_paths["draft"] = draft_file.string();
+            add_label_once(info.labels, "mtp");
+        }
+
         if (!deployment_label.empty() && folder_ids_kept.insert(deployment_label).second) {
             info.input_aliases.push_back(deployment_label);
             info.input_aliases.push_back(std::string(EXTRA_MODEL_PREFIX) + deployment_label);
@@ -1440,6 +1454,7 @@ void ModelManager::discover_extra_models_in_root(
                       return lhs.generic_string() < rhs.generic_string();
                   });
         std::vector<fs::path> mmproj_files;
+        std::vector<fs::path> draft_files;
         std::vector<std::vector<fs::path>> logical_models;
         std::map<std::pair<std::string, int>, size_t> shard_groups;
 
@@ -1447,6 +1462,10 @@ void ModelManager::discover_extra_models_in_root(
             const std::string filename = file.filename().string();
             if (gguf_reader_detail::contains_ignore_case(filename, "mmproj")) {
                 mmproj_files.push_back(file);
+                continue;
+            }
+            if (is_draft_gguf_filename(filename)) {
+                draft_files.push_back(file);
                 continue;
             }
 
@@ -1471,8 +1490,11 @@ void ModelManager::discover_extra_models_in_root(
         const fs::path direct_mmproj = logical_models.size() == 1 && !mmproj_files.empty()
             ? mmproj_files.front()
             : fs::path();
+        const fs::path direct_draft = logical_models.size() == 1 && !draft_files.empty()
+            ? draft_files.front()
+            : fs::path();
         for (const auto& model_files : logical_models) {
-            add_standalone_model(model_files, deployment_label, direct_mmproj);
+            add_standalone_model(model_files, deployment_label, direct_mmproj, direct_draft);
         }
     }
 
@@ -1501,6 +1523,7 @@ void ModelManager::discover_extra_models_in_directory(
     const std::string deployment_label = extra_model_deployment_label(dir_path, search_path);
     fs::path main_model_path; // File the old folder-based discovery would have selected.
     std::vector<fs::path> mmproj_files;
+    std::vector<fs::path> draft_files;
     double total_size = 0.0;
 
     std::vector<std::string> model_filenames;
@@ -1519,6 +1542,11 @@ void ModelManager::discover_extra_models_in_directory(
             continue;
         }
 
+        if (is_draft_gguf_filename(gguf_path.filename().string())) {
+            draft_files.push_back(gguf_path);
+            continue;
+        }
+
         std::string filename = gguf_path.filename().string();
         model_filenames.push_back(filename);
         model_file_sizes.emplace_back(filename, file_size);
@@ -1534,6 +1562,9 @@ void ModelManager::discover_extra_models_in_directory(
 
     std::sort(mmproj_files.begin(), mmproj_files.end());
     fs::path mmproj_file = mmproj_files.empty() ? fs::path() : mmproj_files.front();
+
+    std::sort(draft_files.begin(), draft_files.end());
+    fs::path draft_file = draft_files.empty() ? fs::path() : draft_files.front();
 
     auto vset = lemon::enumerate_gguf_variants(model_filenames, model_file_sizes);
 
@@ -1581,6 +1612,11 @@ void ModelManager::discover_extra_models_in_directory(
                 info.resolved_paths["mmproj"] = mmproj_file.string();
                 info.labels.push_back("vision");
             }
+            if (!draft_file.empty()) {
+                info.checkpoints["draft"] = draft_file.filename().string();
+                info.resolved_paths["draft"] = draft_file.string();
+                add_label_once(info.labels, "mtp");
+            }
             lemon::backends::ensure_deployment_label(info.labels, EXTRA_MODEL_RECIPE);
             info.type = get_model_type_from_labels(info.labels);
 
@@ -1611,6 +1647,11 @@ void ModelManager::discover_extra_models_in_directory(
             info.checkpoints["mmproj"] = mmproj_file.filename().string();
             info.resolved_paths["mmproj"] = mmproj_file.string();
             info.labels.push_back("vision");
+        }
+        if (!draft_file.empty()) {
+            info.checkpoints["draft"] = draft_file.filename().string();
+            info.resolved_paths["draft"] = draft_file.string();
+            add_label_once(info.labels, "mtp");
         }
         lemon::backends::ensure_deployment_label(info.labels, EXTRA_MODEL_RECIPE);
         info.type = get_model_type_from_labels(info.labels);
