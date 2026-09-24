@@ -256,6 +256,10 @@ public:
     // Get loaded backend metadata and per-model telemetry for metrics rendering.
     json get_metrics_snapshot() const;
 
+    // Read each loaded engine's own /metrics, so a client can show throughput
+    // averaged over the backend's lifetime (including requests it did not send).
+    json get_engine_metrics() const;
+
     // Record one completed request's telemetry as a single atomic update.
     void update_request_telemetry(const std::string& model_name,
                                   const StreamingProxy::TelemetryData& telemetry);

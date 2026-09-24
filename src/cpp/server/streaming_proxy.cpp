@@ -66,7 +66,11 @@ void extract_telemetry_from_chunk(const nlohmann::json& chunk, StreamingProxy::T
             telemetry.output_tokens = timings["predicted_n"].get<int>();
         }
         if (timings.contains("prompt_ms")) {
-            telemetry.time_to_first_token = timings["prompt_ms"].get<double>() / 1000.0;
+            telemetry.prompt_ms = timings["prompt_ms"].get<double>();
+            telemetry.time_to_first_token = telemetry.prompt_ms / 1000.0;
+        }
+        if (timings.contains("predicted_ms")) {
+            telemetry.predicted_ms = timings["predicted_ms"].get<double>();
         }
         if (timings.contains("predicted_per_second")) {
             telemetry.tokens_per_second = timings["predicted_per_second"].get<double>();

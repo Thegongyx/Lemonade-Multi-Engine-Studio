@@ -348,6 +348,8 @@ std::string build_prometheus_metrics(Router& router, const SystemMetrics& system
     metrics.describe("lemonade_model_input_tokens_total", "Cumulative input tokens observed for a model.", "counter");
     metrics.describe("lemonade_model_output_tokens_total", "Cumulative output tokens observed for a model.", "counter");
     metrics.describe("lemonade_model_prompt_tokens_total", "Cumulative prompt tokens observed for a model.", "counter");
+    metrics.describe("lemonade_model_prompt_seconds_total", "Cumulative prompt-processing seconds observed for a model.", "counter");
+    metrics.describe("lemonade_model_predicted_seconds_total", "Cumulative token-generation seconds observed for a model.", "counter");
     metrics.describe("lemonade_model_cache_tokens_total", "Cumulative prompt tokens served from the backend prefix cache for a model.", "counter");
 
     for (const auto& model : model_metrics) {
@@ -414,6 +416,12 @@ std::string build_prometheus_metrics(Router& router, const SystemMetrics& system
                             telemetry.value("prompt_tokens_total", 0ULL));
         metrics.sample_uint("lemonade_model_cache_tokens_total", labels,
                             telemetry.value("cache_tokens_total", 0ULL));
+        if (json_number_as_double(telemetry.value("prompt_seconds_total", json()), metric_value)) {
+            metrics.sample("lemonade_model_prompt_seconds_total", labels, metric_value);
+        }
+        if (json_number_as_double(telemetry.value("predicted_seconds_total", json()), metric_value)) {
+            metrics.sample("lemonade_model_predicted_seconds_total", labels, metric_value);
+        }
     }
 
     std::set<std::string> described_backend_metrics;

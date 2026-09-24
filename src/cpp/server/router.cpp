@@ -19,9 +19,11 @@
 #include "telemetry.h"
 #include <algorithm>
 #include <condition_variable>
+#include <cstdlib>
 #include <iostream>
 #include <mutex>
 #include <queue>
+#include <sstream>
 #include <thread>
 #include "lemon/utils/aixlog.hpp"
 #include "lemon/global_vram_monitor.h"
@@ -2381,6 +2383,70 @@ json Router::get_stats() const {
     return stats;
 }
 
+json Router::get_engine_metrics() const {
+    std::vector<std::pair<std::string, int>> targets;
+    {
+        std::lock_guard<std::mutex> lock(load_mutex_);
+        for (const auto& server : loaded_servers_) {
+            const ModelTelemetryIdentity identity = get_telemetry_identity(server.get());
+            const std::string base = server->get_address();
+            const size_t colon = base.find_last_of(':');
+            if (colon == std::string::npos) {
+                continue;
+            }
+            targets.emplace_back(model_manager_->get_public_model_name(identity.model_name),
+                                 std::atoi(base.c_str() + colon + 1));
+        }
+    }
+
+    // llama.cpp exposes lifetime averages (tokens_seconds = tokens/second) and
+    // the raw totals behind them on its own /metrics endpoint.
+    static const std::map<std::string, const char*> kGauges = {
+        {"llamacpp:prompt_tokens_seconds", "prefill_tokens_per_second"},
+        {"llamacpp:predicted_tokens_seconds", "tokens_per_second"},
+        {"llamacpp:prompt_tokens_total", "prompt_tokens_total"},
+        {"llamacpp:tokens_predicted_total", "output_tokens_total"},
+        {"llamacpp:prompt_seconds_total", "prompt_seconds_total"},
+        {"llamacpp:tokens_predicted_seconds_total", "predicted_seconds_total"},
+    };
+
+    json result = json::object();
+    for (const auto& target : targets) {
+        httplib::Client client("127.0.0.1", target.second);
+        client.set_connection_timeout(0, 800000);
+        client.set_read_timeout(0, 1500000);
+        const auto res = client.Get("/metrics");
+        if (!res || res->status != 200) {
+            continue;
+        }
+        json model = json::object();
+        std::istringstream stream(res->body);
+        std::string line;
+        while (std::getline(stream, line)) {
+            if (line.empty() || line[0] == '#') {
+                continue;
+            }
+            const size_t space = line.find(' ');
+            if (space == std::string::npos) {
+                continue;
+            }
+            const auto gauge = kGauges.find(line.substr(0, space));
+            if (gauge == kGauges.end()) {
+                continue;
+            }
+            try {
+                model[gauge->second] = std::stod(line.substr(space + 1));
+            } catch (const std::exception&) {
+                // Not a plain number (unexpected labels); skip the sample.
+            }
+        }
+        if (!model.empty()) {
+            result[target.first] = std::move(model);
+        }
+    }
+    return result;
+}
+
 json Router::get_metrics_snapshot() const {
     json result;
     result["loaded_models"] = json::array();
@@ -2516,6 +2582,12 @@ void Router::record_request_telemetry_for_model(const ModelTelemetryIdentity& id
         }
         if (telemetry.cache_tokens > 0) {
             t->cache_tokens_total += static_cast<uint64_t>(telemetry.cache_tokens);
+        }
+        if (telemetry.prompt_ms > 0.0) {
+            t->prompt_seconds_total += telemetry.prompt_ms / 1000.0;
+        }
+        if (telemetry.predicted_ms > 0.0) {
+            t->predicted_seconds_total += telemetry.predicted_ms / 1000.0;
         }
     }
 }

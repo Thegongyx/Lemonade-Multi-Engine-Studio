@@ -23,6 +23,7 @@ function StatLine({ s }: { s: ModelTelemetry }) {
   const promptTok = s.prompt_tokens > 0 ? s.prompt_tokens : s.input_tokens;
   return (
     <div className="chat-stats mono">
+      <span>{t("chat.thisRequest")}:</span>
       <span>
         {t("chat.prefill")} {fmt(s.prefill_tokens_per_second)} {t("chat.tps")}
       </span>
@@ -204,6 +205,18 @@ export default function ChatPage() {
     totals && totals.draft_n_total > 0
       ? `${((totals.draft_n_accepted_total / totals.draft_n_total) * 100).toFixed(0)}%`
       : null;
+  // Time-weighted over the requests this client sent: processed tokens / summed
+  // backend seconds (input_tokens_total counts processed tokens, not the cached
+  // prefix, so a cache hit does not dilute the rate).
+  const sessionPrefill =
+    totals && totals.prompt_seconds_total > 0
+      ? totals.input_tokens_total / totals.prompt_seconds_total
+      : undefined;
+  const sessionDecode =
+    totals && totals.predicted_seconds_total > 0
+      ? totals.output_tokens_total / totals.predicted_seconds_total
+      : undefined;
+  const engine = totals?.engine?.[model];
 
   return (
     <>
@@ -248,6 +261,30 @@ export default function ChatPage() {
                 {t("chat.draft")} {totalDraftPct}
               </span>
             )}
+          </div>
+        )}
+        {(sessionPrefill !== undefined || sessionDecode !== undefined) && (
+          <div className="chat-stats mono" style={{ marginTop: 4 }}>
+            <span>{t("chat.avgSession")}:</span>
+            <span>
+              {t("chat.prefill")} {fmt(sessionPrefill)} {t("chat.tps")}
+            </span>
+            <span>
+              {t("chat.decode")} {fmt(sessionDecode)} {t("chat.tps")}
+            </span>
+          </div>
+        )}
+        {engine && (
+          <div className="chat-stats mono" style={{ marginTop: 4 }}>
+            <span>
+              {t("chat.avgEngine")} ({t("chat.sinceLoad")}):
+            </span>
+            <span>
+              {t("chat.prefill")} {fmt(engine.prefill_tokens_per_second)} {t("chat.tps")}
+            </span>
+            <span>
+              {t("chat.decode")} {fmt(engine.tokens_per_second)} {t("chat.tps")}
+            </span>
           </div>
         )}
       </div>

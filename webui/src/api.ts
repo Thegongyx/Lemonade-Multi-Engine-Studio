@@ -62,12 +62,26 @@ export type ModelTelemetry = {
   output_tokens_total: number;
   prompt_tokens_total: number;
   cache_tokens_total: number;
+  prompt_seconds_total: number;
+  predicted_seconds_total: number;
+};
+
+// Lifetime averages the engine reports on its own /metrics (llama.cpp
+// `*_tokens_seconds`), read back by the server as GET /api/v1/stats -> "engine".
+export type EngineAverages = {
+  prefill_tokens_per_second?: number;
+  tokens_per_second?: number;
+  prompt_tokens_total?: number;
+  output_tokens_total?: number;
+  prompt_seconds_total?: number;
+  predicted_seconds_total?: number;
 };
 
 export type Stats = ModelTelemetry & {
   routing_decisions_total: number;
   routing_switches_total: number;
   models?: Record<string, ModelTelemetry>;
+  engine?: Record<string, EngineAverages>;
 };
 
 // Server-owned download job (GET /downloads). Lives in the server, so a page

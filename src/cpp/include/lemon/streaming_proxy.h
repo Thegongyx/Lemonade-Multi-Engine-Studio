@@ -26,6 +26,11 @@ public:
         int cache_tokens = -1;
         double time_to_first_token = 0.0;
         double tokens_per_second = 0.0;
+        // Raw llama.cpp timings, accumulated into the session averages. Kept
+        // separate from time_to_first_token, which usage.prefill_duration_ttft
+        // may override with a different measurement.
+        double prompt_ms = 0.0;
+        double predicted_ms = 0.0;
         // llama.cpp timings: prompt_per_second (prefill throughput), and the
         // speculative-decoding counters, when the backend reports them.
         double prefill_tokens_per_second = 0.0;

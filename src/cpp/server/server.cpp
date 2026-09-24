@@ -6860,6 +6860,7 @@ void Server::handle_stats(const httplib::Request& req, httplib::Response& res) {
 
     try {
         auto stats = router_->get_stats();
+        stats["engine"] = router_->get_engine_metrics();
         res.set_content(stats.dump(), "application/json");
     } catch (const std::exception& e) {
         LOG(ERROR, "Server") << "ERROR in handle_stats: " << e.what() << std::endl;

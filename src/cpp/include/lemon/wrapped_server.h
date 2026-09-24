@@ -54,6 +54,10 @@ struct Telemetry {
     uint64_t output_tokens_total = 0;
     uint64_t prompt_tokens_total = 0;
     uint64_t cache_tokens_total = 0;
+    // Summed backend durations, so a client can show a time-weighted average
+    // (tokens_total / seconds_total) next to the latest request's rates.
+    double prompt_seconds_total = 0.0;
+    double predicted_seconds_total = 0.0;
 
     void reset() {
         input_tokens = 0;
@@ -72,6 +76,8 @@ struct Telemetry {
         output_tokens_total = 0;
         prompt_tokens_total = 0;
         cache_tokens_total = 0;
+        prompt_seconds_total = 0.0;
+        predicted_seconds_total = 0.0;
     }
 
     json to_json() const {
@@ -91,7 +97,9 @@ struct Telemetry {
             {"input_tokens_total", input_tokens_total},
             {"output_tokens_total", output_tokens_total},
             {"prompt_tokens_total", prompt_tokens_total},
-            {"cache_tokens_total", cache_tokens_total}
+            {"cache_tokens_total", cache_tokens_total},
+            {"prompt_seconds_total", prompt_seconds_total},
+            {"predicted_seconds_total", predicted_seconds_total}
         };
     }
 };

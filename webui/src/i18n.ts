@@ -151,6 +151,10 @@ const zh = {
     genTok: "生成",
     session: "本次会话",
     requests: "请求",
+    thisRequest: "本次",
+    avgSession: "会话平均",
+    avgEngine: "引擎平均",
+    sinceLoad: "自加载以来",
   },
   runtime: {
     title: "运行控制",
@@ -352,6 +356,10 @@ const en: typeof zh = {
     genTok: "gen",
     session: "Session",
     requests: "requests",
+    thisRequest: "this request",
+    avgSession: "Session avg",
+    avgEngine: "Engine avg",
+    sinceLoad: "since load",
   },
   runtime: {
     title: "Runtime",
