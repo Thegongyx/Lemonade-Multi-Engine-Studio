@@ -38,6 +38,12 @@ struct Telemetry {
     int output_tokens = 0;
     double time_to_first_token = 0.0;
     double tokens_per_second = 0.0;
+    // Prefill throughput and speculative-decoding counters from llama.cpp.
+    double prefill_tokens_per_second = 0.0;
+    int draft_n = 0;
+    int draft_n_accepted = 0;
+    uint64_t draft_n_total = 0;
+    uint64_t draft_n_accepted_total = 0;
     int prompt_tokens = 0;  // From usage.prompt_tokens (includes cached tokens)
     // Prompt tokens served from the backend's prefix cache on the latest
     // request. -1 = the latest request did not report cache usage; rendered as
@@ -54,6 +60,11 @@ struct Telemetry {
         output_tokens = 0;
         time_to_first_token = 0.0;
         tokens_per_second = 0.0;
+        prefill_tokens_per_second = 0.0;
+        draft_n = 0;
+        draft_n_accepted = 0;
+        draft_n_total = 0;
+        draft_n_accepted_total = 0;
         prompt_tokens = 0;
         cache_tokens = -1;
         request_count_total = 0;
@@ -69,6 +80,11 @@ struct Telemetry {
             {"output_tokens", output_tokens},
             {"time_to_first_token", time_to_first_token},
             {"tokens_per_second", tokens_per_second},
+            {"prefill_tokens_per_second", prefill_tokens_per_second},
+            {"draft_n", draft_n},
+            {"draft_n_accepted", draft_n_accepted},
+            {"draft_n_total", draft_n_total},
+            {"draft_n_accepted_total", draft_n_accepted_total},
             {"prompt_tokens", prompt_tokens},
             {"cache_tokens", cache_tokens >= 0 ? json(cache_tokens) : json(nullptr)},
             {"request_count_total", request_count_total},

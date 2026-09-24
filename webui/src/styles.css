@@ -161,6 +161,8 @@ tr:hover td { background: var(--bg-elev-2); }
 .chat-role { font-size: 11px; color: var(--text-dim); margin-bottom: 3px; }
 .chat-text { background: var(--bg-elev-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 9px 12px; white-space: pre-wrap; word-break: break-word; }
 .chat-msg.user .chat-text { background: rgba(245, 197, 66, .12); border-color: rgba(245, 197, 66, .3); }
+.chat-stats { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 4px; font-size: 11px; color: var(--text-dim); }
+.chat-stats span { white-space: nowrap; }
 .chat-input { margin-top: 10px; align-items: stretch; }
 .chat-input textarea { flex: 1; min-height: 48px; }
 .chat-logs { display: flex; flex-direction: column; }

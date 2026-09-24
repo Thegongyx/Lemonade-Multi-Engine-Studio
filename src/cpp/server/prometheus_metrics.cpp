@@ -338,6 +338,12 @@ std::string build_prometheus_metrics(Router& router, const SystemMetrics& system
     metrics.describe("lemonade_model_cache_tokens", "Latest prompt tokens served from the backend prefix cache for a model.", "gauge");
     metrics.describe("lemonade_model_time_to_first_token_seconds", "Latest time to first token reported by a model.", "gauge");
     metrics.describe("lemonade_model_tokens_per_second", "Latest generation throughput reported by a model.", "gauge");
+    metrics.describe("lemonade_model_prefill_tokens_per_second", "Latest prompt-processing (prefill) throughput reported by a model.", "gauge");
+    metrics.describe("lemonade_model_draft_n", "Draft tokens proposed on the latest speculative pass of a model.", "gauge");
+    metrics.describe("lemonade_model_draft_n_accepted", "Draft tokens accepted on the latest speculative pass of a model.", "gauge");
+    metrics.describe("lemonade_model_draft_acceptance_ratio", "Accepted/proposed draft tokens on the latest speculative pass of a model.", "gauge");
+    metrics.describe("lemonade_model_draft_tokens_total", "Cumulative draft tokens proposed by a model.", "counter");
+    metrics.describe("lemonade_model_draft_tokens_accepted_total", "Cumulative draft tokens accepted by a model.", "counter");
     metrics.describe("lemonade_model_requests_total", "Cumulative inference requests observed for a model.", "counter");
     metrics.describe("lemonade_model_input_tokens_total", "Cumulative input tokens observed for a model.", "counter");
     metrics.describe("lemonade_model_output_tokens_total", "Cumulative output tokens observed for a model.", "counter");
@@ -376,6 +382,27 @@ std::string build_prometheus_metrics(Router& router, const SystemMetrics& system
         if (json_number_as_double(telemetry.value("tokens_per_second", json()), metric_value)) {
             metrics.sample("lemonade_model_tokens_per_second", labels, metric_value);
         }
+        if (json_number_as_double(telemetry.value("prefill_tokens_per_second", json()), metric_value)) {
+            metrics.sample("lemonade_model_prefill_tokens_per_second", labels, metric_value);
+        }
+        double draft_n = 0.0;
+        double draft_accepted = 0.0;
+        if (json_number_as_double(telemetry.value("draft_n", json()), metric_value)) {
+            draft_n = metric_value;
+            metrics.sample("lemonade_model_draft_n", labels, metric_value);
+        }
+        if (json_number_as_double(telemetry.value("draft_n_accepted", json()), metric_value)) {
+            draft_accepted = metric_value;
+            metrics.sample("lemonade_model_draft_n_accepted", labels, metric_value);
+        }
+        if (draft_n > 0.0) {
+            metrics.sample("lemonade_model_draft_acceptance_ratio", labels, draft_accepted / draft_n);
+        }
+
+        metrics.sample_uint("lemonade_model_draft_tokens_total", labels,
+                            telemetry.value("draft_n_total", 0ULL));
+        metrics.sample_uint("lemonade_model_draft_tokens_accepted_total", labels,
+                            telemetry.value("draft_n_accepted_total", 0ULL));
 
         metrics.sample_uint("lemonade_model_requests_total", labels,
                             telemetry.value("request_count_total", 0ULL));

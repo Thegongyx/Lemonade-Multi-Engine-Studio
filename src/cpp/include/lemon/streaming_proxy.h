@@ -26,6 +26,11 @@ public:
         int cache_tokens = -1;
         double time_to_first_token = 0.0;
         double tokens_per_second = 0.0;
+        // llama.cpp timings: prompt_per_second (prefill throughput), and the
+        // speculative-decoding counters, when the backend reports them.
+        double prefill_tokens_per_second = 0.0;
+        int draft_n = 0;
+        int draft_n_accepted = 0;
         std::string error_message = "";
         std::string model_name = "";
 

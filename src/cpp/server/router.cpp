@@ -2369,6 +2369,15 @@ json Router::get_stats() const {
     json stats = aggregate_telemetry_.to_json();
     stats["routing_decisions_total"] = routing_decisions_total_;
     stats["routing_switches_total"] = routing_switches_total_;
+
+    // Per-model telemetry, keyed by public model name, so a client can show the
+    // latest prefill/decode rates and draft acceptance for the model it used.
+    json models = json::object();
+    for (const auto& item : telemetry_by_model_) {
+        models[model_manager_->get_public_model_name(item.second.identity.model_name)] =
+            item.second.telemetry.to_json();
+    }
+    stats["models"] = std::move(models);
     return stats;
 }
 
@@ -2486,6 +2495,11 @@ void Router::record_request_telemetry_for_model(const ModelTelemetryIdentity& id
         t->output_tokens = telemetry.output_tokens;
         t->time_to_first_token = telemetry.time_to_first_token;
         t->tokens_per_second = telemetry.tokens_per_second;
+        t->prefill_tokens_per_second = telemetry.prefill_tokens_per_second;
+        t->draft_n = telemetry.draft_n;
+        t->draft_n_accepted = telemetry.draft_n_accepted;
+        t->draft_n_total += static_cast<uint64_t>(telemetry.draft_n > 0 ? telemetry.draft_n : 0);
+        t->draft_n_accepted_total += static_cast<uint64_t>(telemetry.draft_n_accepted > 0 ? telemetry.draft_n_accepted : 0);
         t->cache_tokens = telemetry.cache_tokens >= 0 ? telemetry.cache_tokens : -1;
         t->request_count_total++;
         if (prompt_tokens >= 0) {

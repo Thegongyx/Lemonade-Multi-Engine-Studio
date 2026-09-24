@@ -1,12 +1,52 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Send, ScrollText, X, RefreshCw } from "lucide-react";
-import { api, type ModelInfo } from "../api";
+import { Send, ScrollText, X, RefreshCw, Square } from "lucide-react";
+import { api, type ModelInfo, type ModelTelemetry, type Stats } from "../api";
 
-type Msg = { role: "user" | "assistant"; content: string };
+type Msg = {
+  role: "user" | "assistant";
+  content: string;
+  model?: string;
+  stats?: ModelTelemetry;
+};
 type LogLine = { timestamp: string; severity: string; tag: string; line: string };
 
 const apiKey = () => localStorage.getItem("apiKey") || "lemonade";
+
+const fmt = (n: number | undefined, digits = 1) =>
+  typeof n === "number" && Number.isFinite(n) ? n.toFixed(digits) : "—";
+
+function StatLine({ s }: { s: ModelTelemetry }) {
+  const { t } = useTranslation();
+  const draftPct =
+    s.draft_n > 0 ? `${((s.draft_n_accepted / s.draft_n) * 100).toFixed(0)}%` : null;
+  const promptTok = s.prompt_tokens > 0 ? s.prompt_tokens : s.input_tokens;
+  return (
+    <div className="chat-stats mono">
+      <span>
+        {t("chat.prefill")} {fmt(s.prefill_tokens_per_second)} {t("chat.tps")}
+      </span>
+      <span>
+        {t("chat.decode")} {fmt(s.tokens_per_second)} {t("chat.tps")}
+      </span>
+      <span>
+        {t("chat.ttft")} {fmt(s.time_to_first_token, 2)} s
+      </span>
+      {draftPct && (
+        <span>
+          {t("chat.draft")} {draftPct} ({s.draft_n_accepted}/{s.draft_n})
+        </span>
+      )}
+      <span>
+        {t("chat.promptTok")} {promptTok}
+        {typeof s.cache_tokens === "number" ? ` (${t("chat.cached")} ${s.cache_tokens})` : ""}
+      </span>
+      <span>
+        {t("chat.genTok")} {s.output_tokens}
+      </span>
+    </div>
+  );
+}
 
 export default function ChatPage() {
   const { t } = useTranslation();
@@ -20,9 +60,18 @@ export default function ChatPage() {
   const [logsOpen, setLogsOpen] = useState(false);
   const [logs, setLogs] = useState<LogLine[]>([]);
   const [autoLog, setAutoLog] = useState(true);
+  const [totals, setTotals] = useState<Stats | null>(null);
 
   const logBox = useRef<HTMLDivElement>(null);
   const chatBox = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Only models that are present locally make sense to send to; keep the whole
+  // list when the server does not report the flag.
+  const selectable = useMemo(() => {
+    const local = models.filter((m) => m.downloaded !== false);
+    return local.length > 0 ? local : models;
+  }, [models]);
 
   const loadModels = () => {
     api
@@ -30,7 +79,9 @@ export default function ChatPage() {
       .then((r) => {
         const list = r.data || [];
         setModels(list);
-        if (!model && list.length > 0) setModel(list[0].id);
+        const local = list.filter((m) => m.downloaded !== false);
+        const candidates = local.length > 0 ? local : list;
+        setModel((cur) => cur || (candidates[0]?.id ?? ""));
       })
       .catch((e) => setError(String(e)));
     api
@@ -41,6 +92,7 @@ export default function ChatPage() {
         setRunning(new Set(arr.map((x) => (x as { model_name?: string })?.model_name || "").filter(Boolean)));
       })
       .catch(() => {});
+    api.stats().then(setTotals).catch(() => {});
   };
   useEffect(loadModels, []);
 
@@ -60,19 +112,28 @@ export default function ChatPage() {
     if (chatBox.current) chatBox.current.scrollTop = chatBox.current.scrollHeight;
   }, [messages]);
 
+  const stop = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+  };
+
   const send = async () => {
     if (!model || !input.trim() || streaming) return;
     const userMsg: Msg = { role: "user", content: input.trim() };
     const history = [...messages, userMsg];
-    setMessages([...history, { role: "assistant", content: "" }]);
+    const sentModel = model;
+    setMessages([...history, { role: "assistant", content: "", model: sentModel }]);
     setInput("");
     setStreaming(true);
     setError("");
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       const res = await fetch("/api/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey()}` },
-        body: JSON.stringify({ model, messages: history, stream: true }),
+        body: JSON.stringify({ model: sentModel, messages: history, stream: true }),
+        signal: controller.signal,
       });
       if (!res.ok || !res.body) {
         throw new Error(`${res.status} ${res.statusText}: ${await res.text().catch(() => "")}`);
@@ -81,37 +142,68 @@ export default function ChatPage() {
       const decoder = new TextDecoder();
       let assistant = "";
       let buf = "";
+      const handleLine = (line: string) => {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("data:")) return;
+        const data = trimmed.slice(5).trim();
+        if (!data || data === "[DONE]") return;
+        try {
+          const j = JSON.parse(data);
+          const delta = j.choices?.[0]?.delta?.content || "";
+          if (delta) {
+            assistant += delta;
+            setMessages([...history, { role: "assistant", content: assistant, model: sentModel }]);
+          }
+        } catch {
+          /* ignore partial */
+        }
+      };
       for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
         buf += decoder.decode(value, { stream: true });
         const lines = buf.split("\n");
         buf = lines.pop() || "";
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed.startsWith("data:")) continue;
-          const data = trimmed.slice(5).trim();
-          if (!data || data === "[DONE]") continue;
-          try {
-            const j = JSON.parse(data);
-            const delta = j.choices?.[0]?.delta?.content || "";
-            if (delta) {
-              assistant += delta;
-              setMessages([...history, { role: "assistant", content: assistant }]);
-            }
-          } catch {
-            /* ignore partial */
-          }
-        }
+        for (const line of lines) handleLine(line);
       }
-      loadModels();
+      if (buf) handleLine(buf); // stream ended without a trailing newline
+
+      // Attach the rates of this request to the message that was just produced.
+      try {
+        const stats = await api.stats();
+        setTotals(stats);
+        const perModel = stats.models?.[sentModel] ?? stats;
+        setMessages((cur) => {
+          const next = [...cur];
+          for (let i = next.length - 1; i >= 0; i--) {
+            if (next[i].role === "assistant") {
+              next[i] = { ...next[i], stats: perModel };
+              break;
+            }
+          }
+          return next;
+        });
+      } catch {
+        /* stats are optional */
+      }
     } catch (e) {
-      setError(String(e));
-      setMessages(history);
+      if ((e as Error)?.name === "AbortError") {
+        // Keep whatever was produced before the user stopped it.
+      } else {
+        setError(String(e));
+        setMessages(history);
+      }
     } finally {
+      abortRef.current = null;
       setStreaming(false);
+      loadModels();
     }
   };
+
+  const totalDraftPct =
+    totals && totals.draft_n_total > 0
+      ? `${((totals.draft_n_accepted_total / totals.draft_n_total) * 100).toFixed(0)}%`
+      : null;
 
   return (
     <>
@@ -125,7 +217,7 @@ export default function ChatPage() {
           <label className="field" style={{ marginBottom: 0, flex: 1 }}>
             <span>{t("chat.model")}</span>
             <select value={model} onChange={(e) => setModel(e.target.value)} style={{ height: 38 }}>
-              {models.map((m) => (
+              {selectable.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.id}
                   {running.has(m.id) ? `  (${t("runtime.running")})` : ""}
@@ -140,6 +232,24 @@ export default function ChatPage() {
             <ScrollText size={15} /> {logsOpen ? t("chat.hideLogs") : t("chat.showLogs")}
           </button>
         </div>
+        {totals && totals.request_count_total > 0 && (
+          <div className="chat-stats mono" style={{ marginTop: 8 }}>
+            <span>
+              {t("chat.session")}: {t("chat.requests")} {totals.request_count_total}
+            </span>
+            <span>
+              {t("chat.promptTok")} {totals.prompt_tokens_total}
+            </span>
+            <span>
+              {t("chat.genTok")} {totals.output_tokens_total}
+            </span>
+            {totalDraftPct && (
+              <span>
+                {t("chat.draft")} {totalDraftPct}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       <div className={`chat-layout${logsOpen ? " with-logs" : ""}`}>
@@ -148,8 +258,9 @@ export default function ChatPage() {
             {messages.length === 0 && <div className="hint">{t("chat.empty")}</div>}
             {messages.map((m, i) => (
               <div key={i} className={`chat-msg ${m.role}`}>
-                <div className="chat-role">{m.role === "user" ? t("chat.you") : model}</div>
+                <div className="chat-role">{m.role === "user" ? t("chat.you") : m.model || model}</div>
                 <div className="chat-text">{m.content || (streaming ? "…" : "")}</div>
+                {m.stats && <StatLine s={m.stats} />}
               </div>
             ))}
           </div>
@@ -167,9 +278,15 @@ export default function ChatPage() {
               placeholder={t("chat.placeholder")}
               rows={2}
             />
-            <button className="btn primary" onClick={send} disabled={streaming || !model || !input.trim()}>
-              <Send size={15} /> {streaming ? t("chat.sending") : t("chat.send")}
-            </button>
+            {streaming ? (
+              <button className="btn" onClick={stop}>
+                <Square size={15} /> {t("chat.stop")}
+              </button>
+            ) : (
+              <button className="btn primary" onClick={send} disabled={!model || !input.trim()}>
+                <Send size={15} /> {t("chat.send")}
+              </button>
+            )}
           </div>
         </div>
 

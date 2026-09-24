@@ -39,7 +39,35 @@ export type ModelInfo = {
   status?: string;
   port?: number;
   size?: number;
+  downloaded?: boolean;
   recipe_options?: Record<string, unknown>;
+};
+
+// Per-model telemetry from GET /api/v1/stats ("models" map) and the aggregate
+// fields on the same response. Rates are from the model's most recent request.
+export type ModelTelemetry = {
+  input_tokens: number;
+  output_tokens: number;
+  prompt_tokens: number;
+  cache_tokens: number | null;
+  time_to_first_token: number;
+  tokens_per_second: number;
+  prefill_tokens_per_second: number;
+  draft_n: number;
+  draft_n_accepted: number;
+  draft_n_total: number;
+  draft_n_accepted_total: number;
+  request_count_total: number;
+  input_tokens_total: number;
+  output_tokens_total: number;
+  prompt_tokens_total: number;
+  cache_tokens_total: number;
+};
+
+export type Stats = ModelTelemetry & {
+  routing_decisions_total: number;
+  routing_switches_total: number;
+  models?: Record<string, ModelTelemetry>;
 };
 
 // Server-owned download job (GET /downloads). Lives in the server, so a page
@@ -104,6 +132,7 @@ export const api = {
   engineParams: (id: string) =>
     req<{ engine: string; params: EngineParam[] }>(`/engines/${encodeURIComponent(id)}/params`),
   listModels: () => req<{ data: ModelInfo[] }>("/models"),
+  stats: () => req<Stats>("/stats"),
   modelOptions: (id: string) => req<Record<string, unknown>>(`/models/${encodeURIComponent(id)}/options`),
   saveModelOptions: (id: string, options: Record<string, unknown>) =>
     req<{ status: string }>(`/models/${encodeURIComponent(id)}/options`, {
