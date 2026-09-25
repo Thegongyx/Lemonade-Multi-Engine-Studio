@@ -55,6 +55,22 @@ theme:
 # Sidebar / nav structure
 nav:
   - Welcome: index.md
+  - Multi-Engine Studio:
+    - Overview: studio/README.md
+    - Differences from upstream: studio/differences-from-upstream.md
+    - Quick start: studio/quick-start.md
+    - Engine registry: studio/engine-registry.md
+    - Packaging: studio/packaging.md
+  - Engines:
+    - Overview: engines/README.md
+    - Build guides:
+      - HIP (generic): engines/build/BUILD-ROCM-HIP-GENERIC.md
+      - Vulkan (ROCmFPX): engines/build/BUILD-VULKAN-ROCMFPX-WINDOWS.md
+      - ciru-rocmfpx: engines/build/BUILD-CIRU-ROCMFPX-WINDOWS.md
+      - strixllama: engines/build/BUILD-STRIXLLAMA-WINDOWS.md
+    - Benchmark methodology: engines/benchmark-methodology.md
+    - HaloWin: engines/halowin.md
+    - NovaMax skill: engines/novamax-llamacpp-skill/SKILL.md
   - User Guide:
     - Getting Started: guide/README.md
     - Install:

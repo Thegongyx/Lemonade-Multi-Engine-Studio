@@ -21,6 +21,8 @@ __pycache__/
 # Distribution / packaging
 .Python
 build/
+# ...but the engine build guides under docs/engines/build/ are documentation, not build output.
+!/docs/engines/build/
 develop-eggs/
 dist/
 downloads/
