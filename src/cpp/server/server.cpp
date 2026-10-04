@@ -17,6 +17,7 @@
 #include "lemon/ollama_api.h"
 #include "lemon/backends/backend_descriptor_registry.h"
 #include "lemon/backends/cloud/cloud_server.h"
+#include "lemon/backends/halowin/halowin_server.h"
 #include "lemon/backends/sdcpp/sdcpp_server.h"
 #include "lemon/backends/thenoise/thenoise_server.h"
 #include "lemon/backends/backend_utils.h"
@@ -7069,6 +7070,25 @@ void Server::handle_engines(const httplib::Request& req, httplib::Response& res)
                                        {"source", "downloaded"},
                                        {"exists", true}});
                 }
+            }
+        }
+
+        // Non-llama.cpp engine backends installed on this host. The model-config
+        // engine picker reads this endpoint, so a backend such as HaloWin (gdec)
+        // must appear here too, not only under /system-info. The `recipe` field
+        // lets the UI match an engine to a model's recipe.
+        {
+            const std::string halowin_path =
+                lemon::backends::HalowinServer::resolve_engine_binary(/*engine=*/false);
+            if (!halowin_path.empty()) {
+                engines.push_back({{"id", "halowin"},
+                                   {"name", "HaloWin (gfx1151)"},
+                                   {"path", halowin_path},
+                                   {"backend", "halowin"},
+                                   {"device", ""},
+                                   {"recipe", "halowin"},
+                                   {"source", "backend"},
+                                   {"exists", true}});
             }
         }
 

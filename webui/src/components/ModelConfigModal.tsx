@@ -10,15 +10,24 @@ type BuilderParam = { flag: string; value: string; type: EngineParam["type"] };
 export default function ModelConfigModal({
   modelId,
   engines,
+  recipe,
   onClose,
   onSaved,
 }: {
   modelId: string;
   engines: EngineInfo[];
+  recipe?: string;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const { t } = useTranslation();
+  const effectiveRecipe = recipe || "llamacpp";
+  const isLlama = effectiveRecipe === "llamacpp";
+  // A missing engine recipe means the default llama.cpp family; other backends
+  // (e.g. halowin) tag their entries so the picker can tell them apart.
+  const engineRecipe = (e: EngineInfo) => e.recipe || "llamacpp";
+  const compatible = (e: EngineInfo) => engineRecipe(e) === effectiveRecipe;
+  const argsKey = isLlama ? "llamacpp_args" : `${effectiveRecipe}_args`;
   const [engine, setEngine] = useState("");
   const [mode, setMode] = useState<"text" | "builder">("text");
   const [argsText, setArgsText] = useState("");
@@ -42,10 +51,16 @@ export default function ModelConfigModal({
           saved?: Record<string, unknown>;
         };
         const eff = r.effective ?? r.saved ?? {};
-        const eng = String(eff.llamacpp_engine ?? "");
+        let eng = String(eff.llamacpp_engine ?? "");
+        // Non-llama.cpp models have no llamacpp_engine option; default the picker
+        // to this recipe's engine so the installed backend is shown as selected.
+        if (!eng && !isLlama) {
+          const own = engines.find((e) => engineRecipe(e) === effectiveRecipe);
+          if (own) eng = own.id;
+        }
         const savedEnv = String(eff.llamacpp_env ?? "");
         setEngine(eng);
-        setArgsText(String(eff.llamacpp_args ?? ""));
+        setArgsText(String(eff[argsKey] ?? ""));
         // A saved env is the user's own value; otherwise prefill the engine's defaults.
         if (savedEnv.trim() !== "") {
           setEnvText(savedEnv);
@@ -58,7 +73,7 @@ export default function ModelConfigModal({
         setCtxSize(Number.isFinite(cs) && cs > 0 ? String(cs) : "");
       })
       .catch(() => {});
-  }, [modelId]);
+  }, [modelId, argsKey, effectiveRecipe, isLlama, engines]);
 
   const finalArgs = useMemo(() => {
     if (mode === "text") return argsText.trim();
@@ -81,10 +96,14 @@ export default function ModelConfigModal({
     setError("");
     try {
       const payload: Record<string, unknown> = {
-        llamacpp_engine: engine,
-        llamacpp_args: finalArgs,
-        llamacpp_env: envText,
+        [argsKey]: finalArgs,
       };
+      // The engine picker is a llama.cpp concept; other recipes pick their engine
+      // from the recipe itself, so don't persist a stray llamacpp_engine.
+      if (isLlama) {
+        payload.llamacpp_engine = engine;
+        payload.llamacpp_env = envText;
+      }
       // Only send ctx_size when set, so an empty field keeps the global default.
       if (ctxSize.trim() !== "") payload.ctx_size = Number(ctxSize);
       await api.saveModelOptions(modelId, payload);
@@ -125,11 +144,14 @@ export default function ModelConfigModal({
               }}
             >
               <option value="">—</option>
-              {engines.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.name} ({e.backend || "?"})
-                </option>
-              ))}
+              {engines.map((e) => {
+                const ok = compatible(e);
+                return (
+                  <option key={e.id} value={e.id} disabled={!ok}>
+                    {e.name} ({e.backend || "?"}){ok ? "" : ` — ${t("models.engineWrongRecipe")}`}
+                  </option>
+                );
+              })}
             </select>
             <div className="hint">{t("models.engineHint")}</div>
           </label>
@@ -161,7 +183,7 @@ export default function ModelConfigModal({
             <div className="field">
               <div className="row between" style={{ marginBottom: 8 }}>
                 <span style={{ fontSize: 12, color: "var(--text-dim)" }}>{t("models.modeBuilder")}</span>
-                <button className="btn sm" onClick={() => setShowParams(true)} disabled={!engine}>
+                <button className="btn sm" onClick={() => setShowParams(true)} disabled={!engine || !isLlama}>
                   <Wand2 size={14} /> {t("models.openCatalog")}
                 </button>
               </div>
@@ -186,18 +208,20 @@ export default function ModelConfigModal({
             </div>
           )}
 
-          <label className="field">
-            <span>{t("models.envText")}</span>
-            <textarea
-              value={envText}
-              onChange={(e) => {
-                setEnvText(e.target.value);
-                setEnvDirty(true);
-              }}
-              placeholder={t("models.envPlaceholder")}
-            />
-            <div className="hint">{t("models.envHint")}</div>
-          </label>
+          {isLlama && (
+            <label className="field">
+              <span>{t("models.envText")}</span>
+              <textarea
+                value={envText}
+                onChange={(e) => {
+                  setEnvText(e.target.value);
+                  setEnvDirty(true);
+                }}
+                placeholder={t("models.envPlaceholder")}
+              />
+              <div className="hint">{t("models.envHint")}</div>
+            </label>
+          )}
 
           <label className="field">
             <span>{t("models.ctxSize")}</span>

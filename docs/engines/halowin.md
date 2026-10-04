@@ -28,7 +28,7 @@ Lemonade 负责拉起两者、探活、按模型路由与清理。
 lemonade backends install halowin:win
 ```
 
-默认从 GitHub Release `v0.0.1` 下载 `release-windows.zip`（约 70 MB），解压到
+默认从 GitHub Release `v0.0.5` 下载 `releases-windows.zip`（约 70 MB），解压到
 `<cache>\bin\halowin\win\`。自编译引擎可改为在 `config.json` 里指定目录：
 
 ```jsonc
@@ -44,16 +44,23 @@ HaloWin 的模型是一组 **`.hgn` 文件 + `tokenizer/`**，不是 GGUF。默�
 
 ```text
 <models_dir>\halowin\Qwen3.8-Flash-Next\
-├── qwen38-flash-next-w4b.hgn          # 必需（main）
-├── qwen38-flash-next-w4b.overlay.hgn  # 可选（overlay）
+├── qwen38-flash-next-v2.hgn           # 必需（main）
+├── qwen38-flash-next-ngram.hgn        # v2 必需：独立 PLE n-gram 表
 ├── qwen38-flash-next-mtp.hgn          # 可选（MTP 投机草稿）
 ├── qwen38-flash-next-vision.hgn       # 可选（视觉）
+├── qwen38-flash-next-w4b.overlay.hgn  # 可选（仅 v1；v2 会整体跳过）
 └── tokenizer\tokenizer.json           # 必需
 ```
 
-文件名按后缀自动归位（`*mtp*` / `*vision*` / `*overlay*`，其余视为 main），目录名即模型名
-（后缀 `-HaloWin`）。服务启动时会自动发现，出现在 `/v1/models` 与 WebUI 模型列表里。
-权重用引擎自带的 `tools/flashnext2hgn.py` 从 HF safetensors 转换。
+文件名按后缀自动归位（`*ngram*` / `*vision*` / `*overlay*` / `*mtp*`，其余视为 main），
+目录名即模型名（后缀 `-HaloWin`）。服务启动时会自动发现，出现在 `/v1/models` 与 WebUI 模型列表里。
+**hgn v2** 把 PLE n-gram 表拆成独立文件，引擎按张量类型自动识别 v1/v2；后端会把
+`main → overlay → ngram → mtp` 按启动器顺序作为位置参数传给 `gdec`。权重用引擎自带的
+`tools/flashnext2hgn.py` 从 HF safetensors 转换。
+
+> **模型参数设置里的引擎**：`/api/v1/engines` 现在会列出**所有已安装引擎/后端**（含
+> `halowin`，`recipe: "halowin"`）。模型配置弹窗按模型的 recipe 过滤：与当前模型不匹配的
+> 引擎会置灰，halowin 模型会自动选中 `HaloWin`。
 
 ## 使用
 

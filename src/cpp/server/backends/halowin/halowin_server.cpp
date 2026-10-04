@@ -1,3 +1,14 @@
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
+#include <arpa/inet.h>
+#include <fcntl.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#endif
+
 #include "lemon/backends/halowin/halowin_server.h"
 #include "lemon/backends/halowin/halowin.h"
 #include "lemon/backends/backend_ops.h"
@@ -13,7 +24,10 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cerrno>
 #include <chrono>
+#include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <stdexcept>
 #include <thread>
@@ -82,6 +96,72 @@ std::string option_string(const RecipeOptions& options, const std::string& key) 
     return "";
 }
 
+// The v0.0.5 engine only opens its line-protocol port once the weights are
+// resident, so a TCP connect to the engine port is the readiness signal.
+// (`/cache` on gdec-api proxies the engine CSTAT verb, which v0.0.5 no longer
+// answers, so it cannot be used as the gate.)
+bool engine_port_open(const std::string& host, int port, int timeout_ms) {
+#ifdef _WIN32
+    WSADATA wsa;
+    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) return false;
+    bool ok = false;
+    SOCKET s = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (s != INVALID_SOCKET) {
+        sockaddr_in addr{};
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(static_cast<u_short>(port));
+        if (::inet_pton(AF_INET, host.c_str(), &addr.sin_addr) == 1) {
+            u_long nonblock = 1;
+            ::ioctlsocket(s, FIONBIO, &nonblock);
+            if (::connect(s, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == 0) {
+                ok = true;
+            } else if (WSAGetLastError() == WSAEWOULDBLOCK) {
+                fd_set wf;
+                FD_ZERO(&wf);
+                FD_SET(s, &wf);
+                timeval tv{timeout_ms / 1000, (timeout_ms % 1000) * 1000};
+                if (::select(0, nullptr, &wf, nullptr, &tv) > 0) {
+                    int err = 0;
+                    int len = sizeof(err);
+                    ::getsockopt(s, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&err), &len);
+                    ok = (err == 0);
+                }
+            }
+        }
+        ::closesocket(s);
+    }
+    WSACleanup();
+    return ok;
+#else
+    int s = ::socket(AF_INET, SOCK_STREAM, 0);
+    if (s < 0) return false;
+    bool ok = false;
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(static_cast<uint16_t>(port));
+    if (::inet_pton(AF_INET, host.c_str(), &addr.sin_addr) == 1) {
+        const int flags = ::fcntl(s, F_GETFL, 0);
+        ::fcntl(s, F_SETFL, flags | O_NONBLOCK);
+        if (::connect(s, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == 0) {
+            ok = true;
+        } else if (errno == EINPROGRESS) {
+            fd_set wf;
+            FD_ZERO(&wf);
+            FD_SET(s, &wf);
+            timeval tv{timeout_ms / 1000, (timeout_ms % 1000) * 1000};
+            if (::select(s + 1, nullptr, &wf, nullptr, &tv) > 0) {
+                int err = 0;
+                socklen_t len = sizeof(err);
+                ::getsockopt(s, SOL_SOCKET, SO_ERROR, &err, &len);
+                ok = (err == 0);
+            }
+        }
+    }
+    ::close(s);
+    return ok;
+#endif
+}
+
 // A `.hgn` bundle: one main weights file plus the optional overlay/MTP/vision
 // sidecars and a tokenizer directory, all inside one model folder.
 std::vector<ModelInfo> halowin_discover_models() {
@@ -107,6 +187,7 @@ std::vector<ModelInfo> halowin_discover_models() {
 
         std::string main;
         std::string overlay;
+        std::string ngram;
         std::string mtp;
         std::string vision;
         for (const auto& file : fs::directory_iterator(dir, ec)) {
@@ -118,6 +199,11 @@ std::vector<ModelInfo> halowin_discover_models() {
                 if (vision.empty()) vision = utils::path_to_utf8(path);
             } else if (name.find("mtp") != std::string::npos) {
                 if (mtp.empty()) mtp = utils::path_to_utf8(path);
+            } else if (name.find("ngram") != std::string::npos ||
+                       name.find("n-gram") != std::string::npos) {
+                // hgn v2 splits the PLE n-gram table into its own file; it is a
+                // separate positional argument, not a second main checkpoint.
+                if (ngram.empty()) ngram = utils::path_to_utf8(path);
             } else if (name.find("overlay") != std::string::npos) {
                 if (overlay.empty()) overlay = utils::path_to_utf8(path);
             } else if (main.empty()) {
@@ -146,6 +232,10 @@ std::vector<ModelInfo> halowin_discover_models() {
             info.checkpoints["overlay"] = overlay;
             info.resolved_paths["overlay"] = overlay;
         }
+        if (!ngram.empty()) {
+            info.checkpoints["ngram"] = ngram;
+            info.resolved_paths["ngram"] = ngram;
+        }
         if (!mtp.empty()) {
             info.checkpoints["mtp"] = mtp;
             info.resolved_paths["mtp"] = mtp;
@@ -160,6 +250,10 @@ std::vector<ModelInfo> halowin_discover_models() {
 
         std::uintmax_t total_bytes = 0;
         for (const auto& [type, path] : info.resolved_paths) {
+            // The v2 n-gram table is a disk-resident PLE lookup the engine reads
+            // on demand, not part of the resident working set, so it must not
+            // count toward the "too large for RAM" check.
+            if (type == "ngram") continue;
             std::error_code size_ec;
             const fs::path file = utils::path_from_utf8(path);
             if (fs::is_regular_file(file, size_ec)) {
@@ -180,7 +274,9 @@ InstallParams HalowinServer::get_install_params(const std::string& /*backend*/,
                                                 const std::string& /*version*/) {
     InstallParams params;
     params.repo = "IIIIIllllIIIIIlllll/gfx1151-engine";
-    params.filename = "release-windows.zip";
+    // v0.0.4+ renamed the Windows release asset from release-windows.zip to
+    // releases-windows.zip; the pin in backend_versions.json tracks the tag.
+    params.filename = "releases-windows.zip";
     return params;
 }
 
@@ -193,7 +289,7 @@ HalowinServer::~HalowinServer() {
     unload();
 }
 
-std::string HalowinServer::resolve_binary(bool engine) const {
+std::string HalowinServer::resolve_engine_binary(bool engine) {
     const std::string exe = engine ? kEngineExe : kApiExe;
 
     if (auto* cfg = RuntimeConfig::global()) {
@@ -233,10 +329,11 @@ bool HalowinServer::is_backend_alive() const {
 }
 
 bool HalowinServer::wait_for_halowin_ready(long timeout_seconds) {
-    // /health answers as soon as gdec-api is up; /cache only answers 200 once
-    // the engine has finished loading the weights (it probes engine state).
+    // /health answers as soon as gdec-api is up. The v0.0.5 engine opens its
+    // line-protocol port (engine_port_) only after the weights are resident, so
+    // a TCP connect there is the "model loaded" signal; gdec-api /cache cannot
+    // be used because it proxies the engine CSTAT verb, which v0.0.5 dropped.
     const std::string health_url = get_base_url() + "/health";
-    const std::string cache_url = get_base_url() + "/cache";
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(timeout_seconds);
 
     std::cout << "Waiting for HaloWin engine to load (timeout: " << timeout_seconds << "s)..."
@@ -267,8 +364,7 @@ bool HalowinServer::wait_for_halowin_ready(long timeout_seconds) {
             api_up = utils::HttpClient::is_reachable(
                 health_url, 1, utils::HttpSecurityPolicy::TrustedLoopback);
         }
-        if (api_up && utils::HttpClient::is_reachable(
-                          cache_url, 1, utils::HttpSecurityPolicy::TrustedLoopback)) {
+        if (api_up && engine_port_open("127.0.0.1", engine_port_, 1000)) {
             LOG(INFO, "HaloWin") << "Engine is ready" << std::endl;
             start_backend_watchdog("/health");
             return true;
@@ -318,19 +414,20 @@ void HalowinServer::load(const std::string& model_name,
     }
 
     const std::string overlay = model_file("overlay");
+    const std::string ngram = model_file("ngram");
     const std::string mtp = model_file("mtp");
     const std::string vision = model_file("vision");
 
-    std::string api_path = resolve_binary(/*engine=*/false);
-    std::string engine_path = resolve_binary(/*engine=*/true);
+    std::string api_path = resolve_engine_binary(/*engine=*/false);
+    std::string engine_path = resolve_engine_binary(/*engine=*/true);
     if (api_path.empty() || engine_path.empty()) {
         try {
             backend_manager_->install_backend("halowin", "win");
         } catch (const std::exception& e) {
             LOG(WARNING, "HaloWin") << "Engine install failed: " << e.what() << std::endl;
         }
-        if (api_path.empty()) api_path = resolve_binary(/*engine=*/false);
-        if (engine_path.empty()) engine_path = resolve_binary(/*engine=*/true);
+        if (api_path.empty()) api_path = resolve_engine_binary(/*engine=*/false);
+        if (engine_path.empty()) engine_path = resolve_engine_binary(/*engine=*/true);
     }
     if (api_path.empty()) {
         throw std::runtime_error(
@@ -357,16 +454,24 @@ void HalowinServer::load(const std::string& model_name,
         {"GDEC_QSA_KV_BF16", "1"}, {"GDEC_QSA_WMMA", "1"}, {"GDEC_QSA_WMMA_BTV", "1"},
         {"GDEC_MOE_LT", "1"}, {"GDEC_MOE_LT_BF16", "1"}, {"GDEC_GR_BF16", "1"},
         {"GDEC_GDN_STREAM", "1"}, {"GDEC_GDN_WAVE", "1"}, {"GDEC_NOWARMUP", "1"},
+        {"GDEC_GEMM_WMMA", "1"}, {"GDEC_GDN_FUSED", "1"},
         {"GDEC_INDEX_FUSED2", "1"}, {"GDEC_PP_MOE_OUT", "1"},
         {"GDEC_INDEX_STREAM_SELECT", "1"}, {"GDEC_KVSNAP", "1"},
-        {"GDEC_KVSNAP_MAX_GB", "20"}, {"GDEC_SPEC_GAMMA", "3"},
+        {"GDEC_KVSNAP_MAX_GB", "20"}, {"GDEC_RCKPT_MAX", "8"},
+        {"GDEC_KV_PAGED", "1"}, {"GDEC_PARALLEL", "1"},
+        {"GDEC_SPEC_GAMMA", "3"},
     };
 
+    // Positional checkpoint order mirrors start_hgn.sh: main, overlay (v1 only),
+    // the split n-gram table (v2 only; skipped when it is the main file), MTP.
     std::vector<std::string> engine_args;
     engine_args.push_back(main_path);
     if (!overlay.empty()) engine_args.push_back(overlay);
+    if (!ngram.empty() && ngram != main_path) engine_args.push_back(ngram);
     if (!mtp.empty()) engine_args.push_back(mtp);
     engine_args.push_back("--serve");
+    engine_args.push_back("--host");
+    engine_args.push_back("127.0.0.1");
     engine_args.push_back("--port");
     engine_args.push_back(std::to_string(engine_port_));
     engine_args.push_back("--maxctx");

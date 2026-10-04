@@ -19,6 +19,11 @@ class HalowinServer : public WrappedServer {
 public:
     static InstallParams get_install_params(const std::string& backend, const std::string& version);
 
+    // Locate the gdec engine (engine=true) or gdec-api front-end (engine=false):
+    // the halowin_bin_dir override, then the standard *_bin hook, then the
+    // installed release. Also used by the /engines listing.
+    static std::string resolve_engine_binary(bool engine);
+
     HalowinServer(const std::string& log_level, ModelManager* model_manager = nullptr,
                   BackendManager* backend_manager = nullptr);
 
@@ -38,8 +43,6 @@ public:
     json responses(const json& request) override;
 
 private:
-    // Locate the engine/front-end executables (installed release or halowin_bin_dir).
-    std::string resolve_binary(bool engine) const;
     // Block until gdec-api answers and the gdec engine reports ready.
     bool wait_for_halowin_ready(long timeout_seconds);
     void stop_engine();

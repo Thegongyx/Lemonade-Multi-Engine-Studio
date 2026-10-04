@@ -117,7 +117,10 @@ export default function ModelsPage() {
     }
   };
 
-  const engineOf = (m: ModelInfo) => String((m.recipe_options?.llamacpp_engine as string) || "");
+  const engineOf = (m: ModelInfo) => {
+    if (m.recipe && m.recipe !== "llamacpp") return m.recipe;
+    return String((m.recipe_options?.llamacpp_engine as string) || "");
+  };
 
   return (
     <>
@@ -245,6 +248,7 @@ export default function ModelsPage() {
         <ModelConfigModal
           modelId={configFor}
           engines={engines}
+          recipe={models.find((m) => m.id === configFor)?.recipe}
           onClose={() => setConfigFor(null)}
           onSaved={loadModels}
         />

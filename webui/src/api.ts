@@ -17,9 +17,13 @@ export type EngineInfo = {
   path: string;
   backend: string;
   device?: string;
-  source: "registered" | "discovered" | "downloaded";
+  source: "registered" | "discovered" | "downloaded" | "backend";
   variant?: string;
   version?: string;
+  // Recipe an engine belongs to. Absent means "llamacpp" (the default engine
+  // family); non-llama.cpp backends (e.g. halowin) set it so the model config
+  // can tell whether an engine is usable for a given model.
+  recipe?: string;
   exists: boolean;
 };
 
@@ -40,6 +44,7 @@ export type ModelInfo = {
   port?: number;
   size?: number;
   downloaded?: boolean;
+  recipe?: string;
   recipe_options?: Record<string, unknown>;
 };
 
