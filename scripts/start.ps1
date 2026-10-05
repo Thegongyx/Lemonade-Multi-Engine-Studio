@@ -16,7 +16,9 @@ Get-Process lemond -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAct
 Start-Sleep -Milliseconds 500
 
 Write-Host "Starting lemond on http://localhost:$Port ..." -ForegroundColor Cyan
-Start-Process -FilePath $lemond -ArgumentList "`"$cache`"", "`"$cfg`"", "--port", "$Port"
+# Hidden: lemond is a console-subsystem app; a plain Start-Process would open a
+# console window. The tray launcher starts it with CREATE_NO_WINDOW + SW_HIDE.
+Start-Process -FilePath $lemond -ArgumentList "`"$cache`"", "`"$cfg`"", "--port", "$Port" -WindowStyle Hidden
 Start-Sleep -Seconds 8
 
 $url = "http://localhost:$Port/app/"
