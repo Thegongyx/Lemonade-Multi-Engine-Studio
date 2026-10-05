@@ -484,11 +484,17 @@ void HalowinServer::load(const std::string& model_name,
         engine_args.push_back(arg);
     }
 
+    // Match the other backends: capture child output through a pipe (filtered,
+    // CREATE_NO_WINDOW) at info level. Passing filter_health_logs=false makes
+    // the spawn use direct handle inheritance, which gives the console-subsystem
+    // gdec a fresh console window when the parent has none.
+    const bool inherit_child_output = (log_level_ == "info") || is_debug();
+
     LOG(INFO, "HaloWin") << "Starting gdec: " << engine_path << std::endl;
     {
         std::lock_guard<std::mutex> lock(engine_mutex_);
         engine_handle_ = utils::ProcessManager::start_process(
-            engine_path, engine_args, workdir, is_debug(), false, env);
+            engine_path, engine_args, workdir, inherit_child_output, true, env);
         if (!has_process_handle(engine_handle_) ||
             !utils::ProcessManager::is_running(engine_handle_)) {
             engine_handle_ = {nullptr, 0};
@@ -509,7 +515,7 @@ void HalowinServer::load(const std::string& model_name,
 
     LOG(INFO, "HaloWin") << "Starting gdec-api: " << api_path << std::endl;
     const ProcessHandle api_handle = utils::ProcessManager::start_process(
-        api_path, api_args, workdir, is_debug(), true, env);
+        api_path, api_args, workdir, inherit_child_output, true, env);
     set_process_handle(api_handle, api_path, api_args);
     if (!has_process_handle(api_handle) || !utils::ProcessManager::is_running(api_handle)) {
         const ProcessHandle dead = consume_process_handle_for_cleanup();
