@@ -35,6 +35,7 @@ export default function ModelConfigModal({
   const [envDirty, setEnvDirty] = useState(false);
   const [builder, setBuilder] = useState<BuilderParam[]>([]);
   const [ctxSize, setCtxSize] = useState("");
+  const [prefillChunk, setPrefillChunk] = useState("");
   const [showParams, setShowParams] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -71,6 +72,7 @@ export default function ModelConfigModal({
         }
         const cs = Number(eff.ctx_size);
         setCtxSize(Number.isFinite(cs) && cs > 0 ? String(cs) : "");
+        setPrefillChunk(String(eff.halowin_prefill_chunk ?? ""));
       })
       .catch(() => {});
   }, [modelId, argsKey, effectiveRecipe, isLlama, engines]);
@@ -106,6 +108,10 @@ export default function ModelConfigModal({
       }
       // Only send ctx_size when set, so an empty field keeps the global default.
       if (ctxSize.trim() !== "") payload.ctx_size = Number(ctxSize);
+      if (effectiveRecipe === "halowin") {
+        // Blank means "no GDEC_PREFILL_CHUNK" → engine default (Windows 8192).
+        payload.halowin_prefill_chunk = prefillChunk.trim();
+      }
       await api.saveModelOptions(modelId, payload);
       setToast(t("models.saved"));
       onSaved();
@@ -233,6 +239,19 @@ export default function ModelConfigModal({
             />
             <div className="hint">{t("models.ctxSizeHint")}</div>
           </label>
+
+          {effectiveRecipe === "halowin" && (
+            <label className="field">
+              <span>{t("models.prefillChunk")}</span>
+              <input
+                className="mono"
+                value={prefillChunk}
+                onChange={(e) => setPrefillChunk(e.target.value.replace(/[^0-9]/g, ""))}
+                placeholder="4096"
+              />
+              <div className="hint">{t("models.prefillChunkHint")}</div>
+            </label>
+          )}
 
           <label className="field">
             <span>{t("models.finalArgs")}</span>
