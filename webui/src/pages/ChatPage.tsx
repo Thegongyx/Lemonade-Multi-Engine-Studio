@@ -74,28 +74,37 @@ export default function ChatPage() {
     return local.length > 0 ? local : models;
   }, [models]);
 
-  const loadModels = () => {
-    api
-      .listModels()
-      .then((r) => {
-        const list = r.data || [];
-        setModels(list);
-        const local = list.filter((m) => m.downloaded !== false);
-        const candidates = local.length > 0 ? local : list;
-        setModel((cur) => cur || (candidates[0]?.id ?? ""));
-      })
-      .catch((e) => setError(String(e)));
-    api
-      .health()
-      .then((r) => {
-        const v = r.all_models_loaded;
-        const arr = Array.isArray(v) ? v : v ? [v] : [];
-        setRunning(new Set(arr.map((x) => (x as { model_name?: string })?.model_name || "").filter(Boolean)));
-      })
-      .catch(() => {});
+  const loadModels = async () => {
+    // Fetch health first: if a model is already loaded, the chat test should
+    // default to it rather than to the first local model.
+    let runningNames: string[] = [];
+    try {
+      const h = await api.health();
+      const v = h.all_models_loaded;
+      const arr = Array.isArray(v) ? v : v ? [v] : [];
+      runningNames = arr
+        .map((x) => (x as { model_name?: string })?.model_name || "")
+        .filter(Boolean);
+      setRunning(new Set(runningNames));
+    } catch {
+      /* health is optional */
+    }
+    try {
+      const r = await api.listModels();
+      const list = r.data || [];
+      setModels(list);
+      const local = list.filter((m) => m.downloaded !== false);
+      const candidates = local.length > 0 ? local : list;
+      // Keep an explicit user choice; otherwise prefer a loaded model.
+      setModel((cur) => cur || runningNames[0] || candidates[0]?.id || "");
+    } catch (e) {
+      setError(String(e));
+    }
     api.stats().then(setTotals).catch(() => {});
   };
-  useEffect(loadModels, []);
+  useEffect(() => {
+    loadModels();
+  }, []);
 
   useEffect(() => {
     if (!logsOpen) return;
