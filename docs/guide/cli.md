@@ -484,6 +484,7 @@ The following options are available depending on the recipe being used:
 | `--halowin-engine-args ARGS` | Extra arguments passed to the gdec engine | `""` |
 | `--halowin-bin-dir STRING` | Directory containing gdec and gdec-api; overrides the installed engine | `""` |
 | `--halowin-models-dir STRING` | Directory scanned for .hgn model sets | `""` |
+| `--halowin-prefill-chunk STRING` | Prefill chunk in tokens (GDEC_PREFILL_CHUNK); Windows 4096 saves ~3.5 GiB VRAM | `""` |
 <!-- END GENERATED: cli-recipe-options -->
 **Notes:**
 - Unspecified options will use the backend's default values

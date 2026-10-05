@@ -40,6 +40,16 @@ if ($cfg.llamacpp) {
     # them. Drop the map and let discovery populate the list instead.
     $cfg.llamacpp.PSObject.Properties.Remove("custom_engines")
 }
+if ($cfg.halowin) {
+    # halowin_bin_dir / halowin_models_dir are absolute, machine-specific paths;
+    # shipping the developer's values would point a fresh install at someone
+    # else's disk. Blank them so the backend falls back to auto-discovery.
+    foreach ($key in @("halowin_bin_dir", "halowin_models_dir")) {
+        if ($cfg.halowin.PSObject.Properties.Name -contains $key) {
+            $cfg.halowin.$key = ""
+        }
+    }
+}
     $cfg | ConvertTo-Json -Depth 8 | Set-Content $cfgPath -Encoding UTF8
 }
 Remove-Item (Join-Path $out "config\recipe_options.json") -Force -ErrorAction SilentlyContinue

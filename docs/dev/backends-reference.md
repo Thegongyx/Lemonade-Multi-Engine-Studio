@@ -117,6 +117,7 @@ the generator instead. Prose outside the markers is preserved. -->
 | `halowin_engine_args` | `--halowin-engine-args` | ARGS | "" | Extra arguments passed to the gdec engine |
 | `halowin_bin_dir` | `--halowin-bin-dir` | STRING | "" | Directory containing gdec and gdec-api; overrides the installed engine |
 | `halowin_models_dir` | `--halowin-models-dir` | STRING | "" | Directory scanned for .hgn model sets |
+| `halowin_prefill_chunk` | `--halowin-prefill-chunk` | STRING | "" | Prefill chunk in tokens (GDEC_PREFILL_CHUNK); Windows 4096 saves ~3.5 GiB VRAM |
 
 #### `llamacpp` — Llama.cpp GPU
 

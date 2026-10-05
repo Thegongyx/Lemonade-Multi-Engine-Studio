@@ -77,6 +77,7 @@ curl -X POST http://localhost:13305/v1/chat/completions -H "Content-Type: applic
 | `halowin_models_dir` | `""`（= `<models_dir>\halowin`） | 扫描 `.hgn` 模型的目录 |
 | `halowin_args` | `""` | 追加给 `gdec-api` 的参数 |
 | `halowin_engine_args` | `""` | 追加给 `gdec` 的参数 |
+| `halowin_prefill_chunk` | `""` | prefill 分段（token），透传为引擎环境变量 `GDEC_PREFILL_CHUNK`；Windows 设 `4096` 可省约 3.5 GiB 显存（PP 约慢 2%），留空则用引擎默认 8192 |
 | `win_bin` | `"builtin"` | 标准二进制覆盖钩子（`LEMONADE_HALOWIN_WIN_BIN`） |
 
 ## 已知限制

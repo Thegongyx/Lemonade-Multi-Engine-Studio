@@ -450,7 +450,7 @@ void HalowinServer::load(const std::string& model_name,
     const std::string workdir =
         utils::path_to_utf8(utils::path_from_utf8(api_path).parent_path());
 
-    const std::vector<std::pair<std::string, std::string>> env = {
+    std::vector<std::pair<std::string, std::string>> env = {
         {"GDEC_QSA_KV_BF16", "1"}, {"GDEC_QSA_WMMA", "1"}, {"GDEC_QSA_WMMA_BTV", "1"},
         {"GDEC_MOE_LT", "1"}, {"GDEC_MOE_LT_BF16", "1"}, {"GDEC_GR_BF16", "1"},
         {"GDEC_GDN_STREAM", "1"}, {"GDEC_GDN_WAVE", "1"}, {"GDEC_NOWARMUP", "1"},
@@ -461,6 +461,12 @@ void HalowinServer::load(const std::string& model_name,
         {"GDEC_KV_PAGED", "1"}, {"GDEC_PARALLEL", "1"},
         {"GDEC_SPEC_GAMMA", "3"},
     };
+    // Prefill chunk: an empty option keeps the engine default (Windows 8192);
+    // 4096 shrinks the prefill workspace by ~3.5 GiB at a small PP cost.
+    const std::string prefill_chunk = option_string(options, "halowin_prefill_chunk");
+    if (!prefill_chunk.empty()) {
+        env.push_back({"GDEC_PREFILL_CHUNK", prefill_chunk});
+    }
 
     // Positional checkpoint order mirrors start_hgn.sh: main, overlay (v1 only),
     // the split n-gram table (v2 only; skipped when it is the main file), MTP.

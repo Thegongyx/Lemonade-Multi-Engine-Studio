@@ -36,6 +36,9 @@ inline const BackendDescriptor descriptor = {
          "Directory containing gdec and gdec-api; overrides the installed engine", "HaloWin Options"},
         {"halowin_models_dir", "--halowin-models-dir", "", "STRING",
          "Directory scanned for .hgn model sets", "HaloWin Options"},
+        {"halowin_prefill_chunk", "--halowin-prefill-chunk", "", "STRING",
+         "Prefill chunk in tokens (GDEC_PREFILL_CHUNK); Windows 4096 saves ~3.5 GiB VRAM",
+         "HaloWin Options"},
     },
     /*support*/ {
         {"win", {"windows"}, {{"amd_gpu", {"gfx1151"}}}, "AMD Radeon 8060S / Strix Halo (gfx1151)"},
@@ -54,7 +57,8 @@ inline const BackendDescriptor descriptor = {
     /*arg_variants*/    {},
     /*bin_variants*/    {"win"},
     /*config_extra*/    {{"halowin_models_dir", ""}, {"halowin_bin_dir", ""},
-                         {"halowin_args", ""}, {"halowin_engine_args", ""}},
+                         {"halowin_args", ""}, {"halowin_engine_args", ""},
+                         {"halowin_prefill_chunk", ""}},
 };
 
 }  // namespace halowin
