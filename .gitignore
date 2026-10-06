@@ -231,3 +231,6 @@ launcher/*.obj
 launcher/*.res
 launcher/*.exe
 launcher/*.pdb
+
+# Local-only agent instruction file (machine-specific); do not publish.
+/AGENTS.md
