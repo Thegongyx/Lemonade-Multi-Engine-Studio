@@ -172,7 +172,7 @@ export default function RuntimePage() {
   const gpus: Array<{ name?: string; vram_gb?: number; virtual_mem_gb?: number; driver_version?: string; family?: string; integrated?: boolean }> = [
     ...(Array.isArray(devices.amd_gpu) ? devices.amd_gpu : []),
     ...(Array.isArray(devices.nvidia_gpu) ? devices.nvidia_gpu : []),
-  ];
+  ].filter((g) => g && g.name);
   const npu = devices.amd_npu as { name?: string; available?: boolean; family?: string; tops_max_int?: number } | undefined;
   const storage = sys?.model_storage as { used_bytes?: number; total_bytes?: number; free_bytes?: number; error?: string } | undefined;
 

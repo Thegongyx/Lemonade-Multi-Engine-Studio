@@ -59,7 +59,13 @@ function Sidebar() {
 
 export default function App() {
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", localStorage.getItem("theme") || "dark");
+    // ?theme=light|dark overrides the saved preference (also handy for testing).
+    const urlTheme = new URLSearchParams(window.location.search).get("theme");
+    const theme = urlTheme === "light" || urlTheme === "dark"
+      ? urlTheme
+      : (localStorage.getItem("theme") || "dark");
+    if (urlTheme === "light" || urlTheme === "dark") localStorage.setItem("theme", urlTheme);
+    document.documentElement.setAttribute("data-theme", theme);
   }, []);
 
   return (

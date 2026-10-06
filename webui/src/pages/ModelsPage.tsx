@@ -13,6 +13,7 @@ import {
   DownloadCloud,
   CloudDownload,
   FileText,
+  Boxes,
 } from "lucide-react";
 import { api, type EngineInfo, type ModelInfo } from "../api";
 import ModelConfigModal from "../components/ModelConfigModal";
@@ -231,6 +232,30 @@ export default function ModelsPage() {
 
       {tab === "list" && (
         <>
+          <div className="stat-tiles">
+            <div className="stat-tile">
+              <span className="ico"><Boxes size={19} /></span>
+              <div>
+                <div className="v">{models.length}</div>
+                <div className="k">{t("models.statTotal")}</div>
+              </div>
+            </div>
+            <div className="stat-tile">
+              <span className="ico"><DownloadCloud size={19} /></span>
+              <div>
+                <div className="v">{updateCount}</div>
+                <div className="k">{t("models.statUpdatable")}</div>
+              </div>
+            </div>
+            <div className="stat-tile">
+              <span className="ico"><Play size={19} /></span>
+              <div>
+                <div className="v">{models.filter((m) => loaded.has(m.id)).length}</div>
+                <div className="k">{t("models.statRunning")}</div>
+              </div>
+            </div>
+          </div>
+
           <div className="card">
             <h3>{t("paths.title")}</h3>
             <div className="row">

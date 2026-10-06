@@ -36,6 +36,9 @@ const zh = {
   engines: {
     title: "引擎管理",
     desc: "扫描与登记不同的 llama.cpp 编译产物（同后端类型可存在多个构建）",
+    statTotal: "引擎总数",
+    statRegistered: "已登记",
+    statUpdatable: "可更新",
     tabList: "引擎列表",
     tabDownload: "引擎下载",
     registered: "已登记引擎",
@@ -123,6 +126,9 @@ const zh = {
   models: {
     title: "模型管理",
     desc: "扫描本地路径中的模型，为每个模型选择引擎构建、配置参数并启动",
+    statTotal: "模型总数",
+    statUpdatable: "可更新",
+    statRunning: "运行中",
     tabList: "模型列表",
     tabDownload: "模型下载",
     list: "模型列表",
@@ -321,6 +327,9 @@ const en: typeof zh = {
   engines: {
     title: "Engines",
     desc: "Scan and register llama.cpp builds (multiple builds per backend type are allowed)",
+    statTotal: "Total engines",
+    statRegistered: "Registered",
+    statUpdatable: "Updatable",
     tabList: "Engines",
     tabDownload: "Download",
     registered: "Registered engines",
@@ -408,6 +417,9 @@ const en: typeof zh = {
   models: {
     title: "Models",
     desc: "Scan local paths, pick an engine build per model, configure args and launch",
+    statTotal: "Total models",
+    statUpdatable: "Updatable",
+    statRunning: "Running",
     tabList: "Models",
     tabDownload: "Download",
     list: "Models",

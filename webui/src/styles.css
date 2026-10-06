@@ -13,8 +13,9 @@
   --bg: #0e0e0b;
   --bg-top: #0e0e0b;
   --bg-bottom: #201a0e;
-  --glow-1: rgba(252, 216, 70, 0.12);
-  --glow-2: rgba(110, 168, 254, 0.07);
+  --glow-1: rgba(252, 216, 70, 0.22);
+  --glow-2: rgba(110, 168, 254, 0.10);
+  --glow-warm: rgba(255, 138, 80, 0.12);
 
   /* Surfaces */
   --surface: #1a1813;
@@ -52,6 +53,7 @@
   --shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
   --shadow-ambient: 0 12px 48px rgba(0, 0, 0, 0.40);
   --shadow-glow: 0 10px 34px rgba(252, 216, 70, 0.30);
+  --edge-highlight: rgba(255, 255, 255, 0.07);
 
   /* Type */
   --font-display: "Plus Jakarta Sans", "Segoe UI", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -65,8 +67,9 @@
   --bg: #ffffff;
   --bg-top: #ffffff;
   --bg-bottom: #fff8c9;
-  --glow-1: rgba(252, 216, 70, 0.35);
-  --glow-2: rgba(110, 168, 254, 0.10);
+  --glow-1: rgba(252, 216, 70, 0.55);
+  --glow-2: rgba(110, 168, 254, 0.12);
+  --glow-warm: rgba(255, 170, 120, 0.28);
 
   --surface: #f7f7f3;
   --surface-low: #ffffff;
@@ -91,6 +94,7 @@
   --shadow: 0 12px 40px rgba(45, 47, 47, 0.12);
   --shadow-ambient: 0 12px 44px rgba(45, 47, 47, 0.12);
   --shadow-glow: 0 10px 30px rgba(243, 192, 0, 0.32);
+  --edge-highlight: rgba(255, 255, 255, 0.85);
 }
 
 /* ---------------------------------------------------------------- Base --- */
@@ -101,8 +105,9 @@ html, body, #root { height: 100%; margin: 0; }
 
 body {
   background:
-    radial-gradient(1100px 620px at 12% -12%, var(--glow-1), transparent 60%),
-    radial-gradient(900px 520px at 108% 4%, var(--glow-2), transparent 55%),
+    radial-gradient(1200px 640px at 6% -14%, var(--glow-1), transparent 58%),
+    radial-gradient(880px 520px at 104% 2%, var(--glow-warm), transparent 55%),
+    radial-gradient(1000px 760px at 55% 124%, var(--glow-2), transparent 58%),
     linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
   background-attachment: fixed;
   color: var(--text);
@@ -127,7 +132,7 @@ a:hover { text-decoration: underline; }
 
 /* --------------------------------------------------------------- Shell --- */
 
-.app { display: grid; grid-template-columns: 246px 1fr; height: 100%; }
+.app { display: grid; grid-template-columns: 258px 1fr; height: 100%; }
 
 .sidebar {
   position: relative;
@@ -149,8 +154,8 @@ a:hover { text-decoration: underline; }
   background: radial-gradient(circle at 30% 25%, #fff0a8, var(--accent) 70%);
   box-shadow: 0 6px 18px rgba(252, 216, 70, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.6);
 }
-.brand h1 { font-size: 15px; margin: 0; font-weight: 700; }
-.brand p { font-size: 11px; margin: 1px 0 0; color: var(--text-muted); }
+.brand h1 { font-size: 14px; margin: 0; font-weight: 700; white-space: nowrap; }
+.brand p { font-size: 11px; margin: 1px 0 0; color: var(--text-muted); white-space: nowrap; }
 
 .nav-item {
   display: flex; align-items: center; gap: 11px;
@@ -161,12 +166,12 @@ a:hover { text-decoration: underline; }
 }
 .nav-item:hover { background: var(--glass-bg-hover); color: var(--text); text-decoration: none; }
 .nav-item.active {
-  color: var(--text);
-  background: linear-gradient(90deg, var(--accent-soft), rgba(252, 216, 70, 0.02));
-  border-color: rgba(252, 216, 70, 0.30);
-  box-shadow: inset 0 0 0 1px rgba(252, 216, 70, 0.06);
+  color: #241d00;
+  background: linear-gradient(180deg, var(--accent), var(--accent-strong));
+  border-color: transparent;
+  box-shadow: 0 10px 26px rgba(252, 216, 70, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
-.nav-item.active svg { color: var(--accent); }
+.nav-item.active svg { color: #241d00; }
 
 .sidebar-foot { margin-top: auto; padding: 12px 6px 2px; display: flex; gap: 8px; align-items: center; }
 
@@ -189,7 +194,7 @@ a:hover { text-decoration: underline; }
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-card);
   padding: 20px;
-  box-shadow: var(--shadow-ambient);
+  box-shadow: var(--shadow-ambient), inset 0 1px 0 var(--edge-highlight);
   overflow-x: auto;
 }
 .card + .card { margin-top: 18px; }
@@ -198,6 +203,18 @@ a:hover { text-decoration: underline; }
 .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .row.between { justify-content: space-between; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+/* Stat tiles — small glass dashboard cards */
+.stat-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(158px, 1fr)); gap: 14px; margin-bottom: 18px; }
+.stat-tile {
+  display: flex; align-items: center; gap: 13px;
+  background: var(--glass-bg); backdrop-filter: blur(var(--glass-blur)); -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border); border-radius: var(--radius-card);
+  padding: 15px 18px; box-shadow: var(--shadow-ambient);
+}
+.stat-tile .ico { width: 40px; height: 40px; border-radius: 13px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); flex: none; }
+.stat-tile .v { font-family: var(--font-display); font-size: 22px; font-weight: 800; line-height: 1.1; }
+.stat-tile .k { font-size: 11.5px; color: var(--text-muted); margin-top: 1px; }
 
 /* -------------------------------------------------------------- Buttons --- */
 
@@ -257,7 +274,7 @@ label.field > span { display: block; font-size: 12px; font-weight: 600; color: v
 
 table { width: 100%; border-collapse: collapse; table-layout: auto; }
 th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: top; }
-th { color: var(--text-muted); font-weight: 600; font-size: 11.5px; letter-spacing: .02em; white-space: nowrap; }
+th { color: var(--text-muted); font-weight: 700; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
 tbody tr { transition: background .12s ease; }
 tbody tr:hover td { background: var(--surface-2); }
 tbody tr:last-child td { border-bottom: none; }
@@ -273,8 +290,8 @@ td.col-actions .row { flex-wrap: nowrap; justify-content: flex-end; }
 td.col-actions .row > * { flex: 0 0 auto; }
 
 /* Long single-value cells ellipsize instead of stretching the table. */
-.cell-truncate { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 460px; }
-.cell-truncate.narrow { max-width: 260px; }
+.cell-truncate { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 400px; }
+.cell-truncate.narrow { max-width: 240px; }
 
 /* Short values (device, port, version) must never wrap mid-word. */
 td.mono { white-space: nowrap; }

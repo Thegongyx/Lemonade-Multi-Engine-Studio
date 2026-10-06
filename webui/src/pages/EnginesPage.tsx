@@ -12,6 +12,8 @@ import {
   EyeOff,
   PackageMinus,
   Wrench,
+  Boxes,
+  Undo2,
 } from "lucide-react";
 import { api, type BackendInfo, type EngineInfo } from "../api";
 import ParamsModal from "../components/ParamsModal";
@@ -275,6 +277,30 @@ export default function EnginesPage() {
 
       {tab === "list" && (
         <>
+          <div className="stat-tiles">
+            <div className="stat-tile">
+              <span className="ico"><Boxes size={19} /></span>
+              <div>
+                <div className="v">{engines.length}</div>
+                <div className="k">{t("engines.statTotal")}</div>
+              </div>
+            </div>
+            <div className="stat-tile">
+              <span className="ico"><CirclePlus size={19} /></span>
+              <div>
+                <div className="v">{engines.filter((e) => e.source === "registered").length}</div>
+                <div className="k">{t("engines.statRegistered")}</div>
+              </div>
+            </div>
+            <div className="stat-tile">
+              <span className="ico"><DownloadCloud size={19} /></span>
+              <div>
+                <div className="v">{engines.filter((e) => e.update_available).length}</div>
+                <div className="k">{t("engines.statUpdatable")}</div>
+              </div>
+            </div>
+          </div>
+
           <div className="card">
             <h3>{t("engines.addCustom")}</h3>
             <div className="row">
@@ -337,25 +363,25 @@ export default function EnginesPage() {
                       </td>
                       <td className="col-actions">
                         <div className="row">
-                          <button className="btn sm" onClick={() => setParamsFor(e)}>
-                            <ListTree size={14} /> {t("engines.params")}
+                          <button className="btn sm" onClick={() => setParamsFor(e)} title={t("engines.params")}>
+                            <ListTree size={14} />
                           </button>
-                          <button className="btn sm" onClick={() => setConfigFor(e)}>
-                            <Wrench size={14} /> {t("engines.configTitle")}
+                          <button className="btn sm" onClick={() => setConfigFor(e)} title={t("engines.configTitle")}>
+                            <Wrench size={14} />
                           </button>
                           {e.source === "discovered" && (
-                            <button className="btn sm" onClick={() => registerEngine(e)}>
-                              <CirclePlus size={14} /> {t("engines.register")}
+                            <button className="btn sm" onClick={() => registerEngine(e)} title={t("engines.register")}>
+                              <CirclePlus size={14} />
                             </button>
                           )}
                           {e.can_hide && (
-                            <button className="btn sm" onClick={() => hideEngine(e)}>
-                              <EyeOff size={14} /> {t("engines.hide")}
+                            <button className="btn sm" onClick={() => hideEngine(e)} title={t("engines.hide")}>
+                              <EyeOff size={14} />
                             </button>
                           )}
                           {e.can_uninstall && (
-                            <button className="btn sm" onClick={() => uninstallEngine(e)}>
-                              <PackageMinus size={14} /> {t("common.delete")}
+                            <button className="btn sm" onClick={() => uninstallEngine(e)} title={t("common.delete")}>
+                              <PackageMinus size={14} />
                             </button>
                           )}
                           {e.update_available && (
@@ -363,8 +389,9 @@ export default function EnginesPage() {
                               className="btn sm primary"
                               disabled={busy === `update:${e.id}`}
                               onClick={() => updateEngine(e)}
+                              title={t("engines.update")}
                             >
-                              <DownloadCloud size={14} /> {t("engines.update")}
+                              <DownloadCloud size={14} />
                             </button>
                           )}
                           {e.can_delete_files && !e.can_uninstall && (
@@ -374,7 +401,7 @@ export default function EnginesPage() {
                           )}
                           {e.source === "registered" && (
                             <button className="btn sm" onClick={() => removeEngine(e)} title={t("engines.unregister")}>
-                              <Trash2 size={14} /> {t("engines.unregister")}
+                              <Undo2 size={14} />
                             </button>
                           )}
                         </div>
