@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Save, Plug, Sun, Moon, TreePine } from "lucide-react";
+import { Save, Plug, Sun, Moon, TreePine, Film } from "lucide-react";
 import { api } from "../api";
 
 export default function SettingsPage() {
@@ -80,6 +80,9 @@ export default function SettingsPage() {
             </button>
             <button className={`btn sm${theme === "nordic" ? " primary" : ""}`} onClick={() => setTheme("nordic")}>
               <TreePine size={14} /> {t("settings.nordic")}
+            </button>
+            <button className={`btn sm${theme === "film" ? " primary" : ""}`} onClick={() => setTheme("film")}>
+              <Film size={14} /> {t("settings.film")}
             </button>
           </div>
         </label>

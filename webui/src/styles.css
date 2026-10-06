@@ -629,3 +629,113 @@ td.mono { white-space: nowrap; }
 :root[data-theme="nordic"] .tabs { background: transparent; box-shadow: none; border-radius: 0; border-bottom: 1px solid var(--border); padding: 0; gap: 4px; }
 :root[data-theme="nordic"] .tab { border-radius: 0; border-bottom: 2px solid transparent; }
 :root[data-theme="nordic"] .tab.active { background: transparent; box-shadow: none; color: var(--accent-strong); border-bottom-color: var(--accent-2); }
+
+/* =========================================================================
+   Theme: Film (复古电影胶片)
+   High-contrast monochrome, squared "film frame" corners, 35mm sprocket-hole
+   edges, scanline + grain overlays, subtle projector flicker.
+   ========================================================================= */
+
+:root[data-theme="film"] {
+  color-scheme: dark;
+
+  --bg: #0b0f16;
+  --bg-top: #111827;
+  --bg-bottom: #000000;
+  --surface: #1a2130;
+  --surface-2: #242e3d;
+  --surface-sunken: #0d121a;
+
+  --text: #f4f4f5;
+  --text-dim: #d1d5db;
+  --text-muted: #9ca3af;
+  --text-light: #6b7280;
+
+  --border: #374151;
+
+  /* Monochrome: white "projector light" accent, film-border grey secondary. */
+  --accent: #e5e7eb;
+  --accent-strong: #ffffff;
+  --accent-soft: rgba(229, 231, 235, 0.12);
+  --accent-2: #9ca3af;
+  --accent-2-soft: rgba(156, 163, 175, 0.18);
+  --on-accent: #0b0f16;
+  --ok: #6fae8c;
+  --warn: #c9a45c;
+  --err: #c97b7b;
+
+  --nm-dark: rgba(0, 0, 0, 0.6);
+  --nm-light: rgba(255, 255, 255, 0.04);
+  --nm-raised-lg: 0 18px 48px rgba(0, 0, 0, 0.65), inset 0 0 0 1px var(--border);
+  --nm-raised: 0 8px 26px rgba(0, 0, 0, 0.50), inset 0 0 0 1px var(--border);
+  --nm-raised-sm: inset 0 0 0 1px var(--border);
+  --nm-inset: inset 0 0 0 1px var(--border);
+  --nm-inset-sm: inset 0 0 0 1px var(--border);
+  --nm-press: inset 0 0 0 1px var(--accent);
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.50);
+  --shadow-accent: 0 8px 22px rgba(255, 255, 255, 0.18);
+
+  --radius-card: 6px;
+  --radius: 4px;
+  --radius-sm: 4px;
+}
+
+:root[data-theme="film"] body {
+  background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg) 45%, var(--bg-bottom) 100%);
+  background-attachment: fixed;
+}
+
+/* 35mm sprocket-hole strips on both edges. */
+:root[data-theme="film"] body::before {
+  content: "";
+  position: fixed; inset: 0; z-index: 6; pointer-events: none;
+  background:
+    repeating-linear-gradient(180deg, #4b5563 0 12px, #0b0f16 12px 20px) left / 16px 100% repeat-y,
+    repeating-linear-gradient(180deg, #4b5563 0 12px, #0b0f16 12px 20px) right / 16px 100% repeat-y;
+}
+
+/* Scanlines + grain + faint projector flicker. */
+:root[data-theme="film"] body::after {
+  content: "";
+  position: fixed; inset: 0; z-index: 5; pointer-events: none;
+  opacity: .55;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, .04) 0 1px, transparent 1px 3px),
+    url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='140'%20height='140'%3E%3Cfilter%20id='n'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.8'%20numOctaves='2'%20stitchTiles='stitch'/%3E%3C/filter%3E%3Crect%20width='100%25'%20height='100%25'%20filter='url(%23n)'%20opacity='0.35'/%3E%3C/svg%3E");
+  background-size: auto, 140px 140px;
+  animation: film-scan 14s linear infinite, film-flicker 5s steps(2, end) infinite;
+}
+@keyframes film-scan { from { background-position: 0 0, 0 0; } to { background-position: 0 90px, 0 0; } }
+@keyframes film-flicker { 0%, 96%, 100% { opacity: .55; } 97% { opacity: .48; } 98% { opacity: .60; } }
+
+:root[data-theme="film"] .sidebar {
+  background: linear-gradient(180deg, #1a2130 0%, #0b0f16 100%);
+  border-right: 1px solid var(--border);
+}
+:root[data-theme="film"] input,
+:root[data-theme="film"] select,
+:root[data-theme="film"] textarea { background: var(--surface-sunken); }
+:root[data-theme="film"] .btn:not(.primary) { background: var(--surface-2); }
+:root[data-theme="film"] .btn:not(.primary):hover { box-shadow: inset 0 0 0 1px var(--accent), 0 8px 30px rgba(0, 0, 0, 0.5); }
+:root[data-theme="film"] .nav-item:hover { background: var(--surface-2); box-shadow: none; }
+:root[data-theme="film"] .nav-item.active {
+  background: var(--surface-2);
+  color: var(--text);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+:root[data-theme="film"] .nav-item.active svg { color: var(--accent); }
+:root[data-theme="film"] .brand .logo {
+  background: linear-gradient(145deg, #ffffff, #9ca3af);
+  color: #0b0f16;
+  box-shadow: 0 6px 18px rgba(255, 255, 255, 0.18);
+}
+:root[data-theme="film"] .tabs {
+  background: transparent; box-shadow: none; border-radius: 0; padding: 0; gap: 4px;
+  border-bottom: 1px solid var(--border);
+}
+:root[data-theme="film"] .tab { border-radius: 0; border-bottom: 2px solid transparent; letter-spacing: .04em; }
+:root[data-theme="film"] .tab.active { background: transparent; box-shadow: none; color: var(--text); border-bottom-color: var(--accent); }
+:root[data-theme="film"] .page-head h2 { text-transform: uppercase; letter-spacing: .08em; font-weight: 800; }
+:root[data-theme="film"] .card { background: var(--surface); }
+/* Film-style progress: white "light" fill. */
+:root[data-theme="film"] .progress-fill { background: linear-gradient(90deg, #ffffff, #9ca3af); }

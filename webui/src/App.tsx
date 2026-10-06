@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
-import { Boxes, Cpu, SlidersHorizontal, Globe, MessageSquare, Settings, Sun, Moon, TreePine } from "lucide-react";
+import { Boxes, Cpu, SlidersHorizontal, Globe, MessageSquare, Settings, Sun, Moon, TreePine, Film } from "lucide-react";
 import EnginesPage from "./pages/EnginesPage";
 import ModelsPage from "./pages/ModelsPage";
 import ChatPage from "./pages/ChatPage";
@@ -12,7 +12,7 @@ function Sidebar() {
   const { t, i18n } = useTranslation();
   const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "light");
   const toggleTheme = () => {
-    const order = ["light", "dark", "nordic"];
+    const order = ["light", "dark", "nordic", "film"];
     const next = order[(order.indexOf(theme) + 1) % order.length];
     setTheme(next);
     localStorage.setItem("theme", next);
@@ -51,7 +51,7 @@ function Sidebar() {
           {i18n.language.startsWith("zh") ? "中文" : "EN"}
         </button>
         <button className="btn ghost sm" onClick={toggleTheme} title={t("settings.theme")}>
-          {theme === "light" ? <Sun size={15} /> : theme === "dark" ? <Moon size={15} /> : <TreePine size={15} />}
+          {theme === "light" ? <Sun size={15} /> : theme === "dark" ? <Moon size={15} /> : theme === "nordic" ? <TreePine size={15} /> : <Film size={15} />}
         </button>
       </div>
     </aside>
@@ -62,7 +62,7 @@ export default function App() {
   useEffect(() => {
     // ?theme=light|dark overrides the saved preference (also handy for testing).
     const urlTheme = new URLSearchParams(window.location.search).get("theme");
-    const valid = urlTheme === "light" || urlTheme === "dark" || urlTheme === "nordic";
+    const valid = urlTheme === "light" || urlTheme === "dark" || urlTheme === "nordic" || urlTheme === "film";
     const theme = valid ? urlTheme! : (localStorage.getItem("theme") || "light");
     if (valid) localStorage.setItem("theme", urlTheme!);
     document.documentElement.setAttribute("data-theme", theme);
