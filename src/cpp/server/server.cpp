@@ -1428,9 +1428,17 @@ void Server::setup_routes(httplib::Server &web_server) {
         handle_engine_add(req, res);
     });
     for (const char* prefix : {"/api/v0", "/api/v1", "/v0", "/v1"}) {
+        web_server.Post(std::string(prefix) + R"(/engines/([^/]+))",
+                        [this](const httplib::Request& req, httplib::Response& res) {
+            handle_engine_update(req, res);
+        });
         web_server.Delete(std::string(prefix) + R"(/engines/(.+))",
                           [this](const httplib::Request& req, httplib::Response& res) {
             handle_engine_delete(req, res);
+        });
+        web_server.Get(std::string(prefix) + R"(/engines/(.+)/version)",
+                       [this](const httplib::Request& req, httplib::Response& res) {
+            handle_engine_version(req, res);
         });
     }
     register_get("model-paths", [this](const httplib::Request& req, httplib::Response& res) {
@@ -6975,6 +6983,38 @@ void Server::handle_engines(const httplib::Request& req, httplib::Response& res)
             section = cfg->backend_config("llamacpp");
         }
 
+        // Engine ids a user removed from the list without deleting files.
+        std::set<std::string> ignored;
+        if (section.contains("ignored_engines") && section["ignored_engines"].is_array()) {
+            for (const auto& item : section["ignored_engines"]) {
+                if (item.is_string()) ignored.insert(item.get<std::string>());
+            }
+        }
+
+        // Index every llamacpp backend's install status by name. A downloaded
+        // engine directory ("rocm-stable", "vulkan", …) maps back to one of
+        // these so the UI can offer the same update path as the download tab.
+        nlohmann::json backend_status = nlohmann::json::object();
+        if (backend_manager_) {
+            for (const auto& recipe_entry : backend_manager_->get_all_backends_status()) {
+                if (recipe_entry.value("recipe", std::string("")) != "llamacpp") continue;
+                if (!recipe_entry.contains("backends") || !recipe_entry["backends"].is_array()) continue;
+                for (const auto& backend_entry : recipe_entry["backends"]) {
+                    const std::string name = backend_entry.value("name", std::string(""));
+                    if (!name.empty()) backend_status[name] = backend_entry;
+                }
+            }
+        }
+        auto resolve_backend_ref = [&](const std::string& id) -> std::string {
+            if (backend_status.contains(id)) return id;
+            const std::size_t dash = id.find('-');
+            if (dash != std::string::npos) {
+                const std::string base = id.substr(0, dash);
+                if (backend_status.contains(base)) return base;
+            }
+            return "";
+        };
+
         if (section.contains("custom_engines") && section["custom_engines"].is_object()) {
             for (auto it = section["custom_engines"].begin(); it != section["custom_engines"].end(); ++it) {
                 const auto& entry = it.value();
@@ -6982,13 +7022,23 @@ void Server::handle_engines(const httplib::Request& req, httplib::Response& res)
                 std::error_code ec;
                 const bool exists = !path.empty() &&
                     std::filesystem::exists(lemon::utils::path_from_utf8(path), ec);
-                engines.push_back({{"id", it.key()},
-                                   {"name", it.key()},
-                                   {"path", path},
-                                   {"backend", entry.value("backend", std::string(""))},
-                                   {"device", entry.value("device", std::string(""))},
-                                   {"source", "registered"},
-                                   {"exists", exists}});
+                nlohmann::json engine = {{"id", it.key()},
+                                         {"name", it.key()},
+                                         {"path", path},
+                                         {"backend", entry.value("backend", std::string(""))},
+                                         {"device", entry.value("device", std::string(""))},
+                                         {"recipe", "llamacpp"},
+                                         {"source", "registered"},
+                                         {"exists", exists},
+                                         {"can_register", false},
+                                         {"can_hide", false},
+                                         {"can_delete_files", true},
+                                         {"can_uninstall", false},
+                                         {"update_available", false}};
+                if (entry.contains("env") && entry["env"].is_object()) {
+                    engine["env"] = entry["env"];
+                }
+                engines.push_back(std::move(engine));
             }
         }
 
@@ -7006,6 +7056,7 @@ void Server::handle_engines(const httplib::Request& req, httplib::Response& res)
 #endif
                     if (!std::filesystem::exists(exe, ec)) continue;
                     const std::string id = lemon::utils::path_to_utf8(entry.path().filename());
+                    if (ignored.count(id)) continue;
                     bool duplicate = false;
                     for (const auto& existing : engines) {
                         if (existing.value("id", std::string("")) == id) { duplicate = true; break; }
@@ -7028,8 +7079,14 @@ void Server::handle_engines(const httplib::Request& req, httplib::Response& res)
                                        {"path", lemon::utils::path_to_utf8(exe)},
                                        {"backend", backend},
                                        {"device", device},
+                                       {"recipe", "llamacpp"},
                                        {"source", "discovered"},
-                                       {"exists", true}});
+                                       {"exists", true},
+                                       {"can_register", true},
+                                       {"can_hide", true},
+                                       {"can_delete_files", true},
+                                       {"can_uninstall", false},
+                                       {"update_available", false}});
                 }
             }
         }
@@ -7062,13 +7119,31 @@ void Server::handle_engines(const httplib::Request& req, httplib::Response& res)
                     std::string device;
                     if (backend == "rocm") device = "ROCm0";
                     else if (backend == "vulkan") device = "Vulkan0";
-                    engines.push_back({{"id", id},
-                                       {"name", id},
-                                       {"path", lemon::utils::path_to_utf8(exe)},
-                                       {"backend", backend},
-                                       {"device", device},
-                                       {"source", "downloaded"},
-                                       {"exists", true}});
+                    nlohmann::json engine = {{"id", id},
+                                             {"name", id},
+                                             {"path", lemon::utils::path_to_utf8(exe)},
+                                             {"backend", backend},
+                                             {"device", device},
+                                             {"recipe", "llamacpp"},
+                                             {"source", "downloaded"},
+                                             {"exists", true},
+                                             {"can_register", false},
+                                             {"can_hide", false},
+                                             {"can_delete_files", false},
+                                             {"can_uninstall", true},
+                                             {"update_available", false}};
+                    const std::string ref = resolve_backend_ref(id);
+                    if (!ref.empty()) {
+                        const auto& status = backend_status[ref];
+                        const std::string state = status.value("state", std::string(""));
+                        engine["backend_ref"] = ref;
+                        engine["state"] = state;
+                        engine["update_available"] =
+                            state == "update_required" || state == "update_available";
+                        if (status.contains("version")) engine["latest_version"] = status["version"];
+                        if (status.contains("release_url")) engine["release_url"] = status["release_url"];
+                    }
+                    engines.push_back(std::move(engine));
                 }
             }
         }
@@ -7088,7 +7163,12 @@ void Server::handle_engines(const httplib::Request& req, httplib::Response& res)
                                    {"device", ""},
                                    {"recipe", "halowin"},
                                    {"source", "backend"},
-                                   {"exists", true}});
+                                   {"exists", true},
+                                   {"can_register", false},
+                                   {"can_hide", false},
+                                   {"can_delete_files", false},
+                                   {"can_uninstall", true},
+                                   {"update_available", false}});
             }
         }
 
@@ -7177,12 +7257,27 @@ void Server::handle_engine_add(const httplib::Request& req, httplib::Response& r
             nlohmann::json engines = (section.contains("custom_engines") && section["custom_engines"].is_object())
                                      ? section["custom_engines"] : nlohmann::json::object();
             engines[name] = entry;
-            cfg->set({{"llamacpp", {{"custom_engines", engines}}}}, nullptr);
+            // Re-adding an engine that was previously hidden must un-hide it.
+            nlohmann::json ignored = nlohmann::json::array();
+            if (section.contains("ignored_engines") && section["ignored_engines"].is_array()) {
+                for (const auto& item : section["ignored_engines"]) {
+                    if (item.is_string() && item.get<std::string>() != name) ignored.push_back(item);
+                }
+            }
+            cfg->set({{"llamacpp", {{"custom_engines", engines}, {"ignored_engines", ignored}}}}, nullptr);
         }
         if (!config_dir_.empty()) {
             try {
                 nlohmann::json user_cfg = ConfigFile::load_raw(config_dir_);
                 user_cfg["llamacpp"]["custom_engines"][name] = entry;
+                if (user_cfg["llamacpp"].contains("ignored_engines") &&
+                    user_cfg["llamacpp"]["ignored_engines"].is_array()) {
+                    nlohmann::json kept = nlohmann::json::array();
+                    for (const auto& item : user_cfg["llamacpp"]["ignored_engines"]) {
+                        if (item.is_string() && item.get<std::string>() != name) kept.push_back(item);
+                    }
+                    user_cfg["llamacpp"]["ignored_engines"] = kept;
+                }
                 ConfigFile::save(config_dir_, user_cfg);
             } catch (const std::exception& e) {
                 LOG(WARNING, "Server") << "Failed to persist engine: " << e.what() << std::endl;
@@ -7198,32 +7293,225 @@ void Server::handle_engine_add(const httplib::Request& req, httplib::Response& r
     }
 }
 
-void Server::handle_engine_delete(const httplib::Request& req, httplib::Response& res) {
+void Server::handle_engine_version(const httplib::Request& req, httplib::Response& res) {
     if (req.method == "HEAD") { res.status = 200; return; }
     try {
         const std::string id = req.matches.size() > 1 ? req.matches[1].str() : "";
+        nlohmann::json section = nlohmann::json::object();
         if (auto* cfg = RuntimeConfig::global()) {
-            // Remove just this entry: RuntimeConfig replaces the whole custom_engines map,
-            // so {id: null} would drop every other engine and leave a null that 500s /engines.
-            nlohmann::json section = cfg->backend_config("llamacpp");
-            nlohmann::json engines = (section.contains("custom_engines") && section["custom_engines"].is_object())
-                                     ? section["custom_engines"] : nlohmann::json::object();
-            engines.erase(id);
+            section = cfg->backend_config("llamacpp");
+        }
+        const std::string exe = resolve_engine_exe(id, section);
+        if (exe.empty()) {
+            res.status = 404;
+            res.set_content(nlohmann::json{{"error", "engine not found: " + id}}.dump(), "application/json");
+            return;
+        }
+        std::string output;
+        lemon::utils::ProcessManager::run_command("\"" + exe + "\" --version", output, 10);
+        std::string version;
+        std::smatch match;
+        static const std::regex version_re(R"((?:^|\n)\s*version:\s*([^\s\)]+))");
+        if (std::regex_search(output, match, version_re)) {
+            version = match[1].str();
+        } else if (std::regex_search(output, match, std::regex(R"((b\d{3,}|v?\d+\.\d+[\w.\-]*))"))) {
+            // Fall back to a build tag / semver-looking token when --version has
+            // a different shape (some forks print "llama.cpp <tag>").
+            version = match[1].str();
+        }
+        res.set_content(
+            nlohmann::json{{"engine", id}, {"version", version}, {"raw", output}}.dump(),
+            "application/json");
+    } catch (const std::exception& e) {
+        LOG(ERROR, "Server") << "ERROR in handle_engine_version: " << e.what() << std::endl;
+        res.status = 500;
+        res.set_content(nlohmann::json{{"error", e.what()}}.dump(), "application/json");
+    }
+}
+
+void Server::handle_engine_update(const httplib::Request& req, httplib::Response& res) {
+    if (req.method == "HEAD") { res.status = 200; return; }
+    try {
+        const std::string id = req.matches.size() > 1 ? req.matches[1].str() : "";
+        nlohmann::json body = req.body.empty() ? nlohmann::json::object()
+                                               : nlohmann::json::parse(req.body);
+
+        nlohmann::json section = nlohmann::json::object();
+        if (auto* cfg = RuntimeConfig::global()) {
+            section = cfg->backend_config("llamacpp");
+        }
+        if (!section.contains("custom_engines") || !section["custom_engines"].is_object() ||
+            !section["custom_engines"].contains(id)) {
+            res.status = 404;
+            res.set_content(
+                nlohmann::json{{"error", "not a registered engine: " + id}}.dump(),
+                "application/json");
+            return;
+        }
+
+        nlohmann::json engines = section["custom_engines"];
+        nlohmann::json& entry = engines[id];
+        if (body.contains("backend") && body["backend"].is_string()) {
+            entry["backend"] = body["backend"];
+        }
+        if (body.contains("device") && body["device"].is_string()) {
+            entry["device"] = body["device"];
+        }
+        if (body.contains("env")) {
+            // An object replaces the engine env wholesale; null clears it.
+            if (body["env"].is_null()) {
+                entry.erase("env");
+            } else if (body["env"].is_object()) {
+                entry["env"] = body["env"];
+            } else {
+                res.status = 400;
+                res.set_content(
+                    nlohmann::json{{"error", "'env' must be an object or null"}}.dump(),
+                    "application/json");
+                return;
+            }
+        }
+
+        if (auto* cfg = RuntimeConfig::global()) {
             cfg->set({{"llamacpp", {{"custom_engines", engines}}}}, nullptr);
         }
         if (!config_dir_.empty()) {
             try {
                 nlohmann::json user_cfg = ConfigFile::load_raw(config_dir_);
-                if (user_cfg.contains("llamacpp") && user_cfg["llamacpp"].is_object() &&
-                    user_cfg["llamacpp"].contains("custom_engines")) {
-                    user_cfg["llamacpp"]["custom_engines"].erase(id);
-                }
+                user_cfg["llamacpp"]["custom_engines"] = engines;
+                ConfigFile::save(config_dir_, user_cfg);
+            } catch (const std::exception& e) {
+                LOG(WARNING, "Server") << "Failed to persist engine update: " << e.what() << std::endl;
+            }
+        }
+        res.set_content(nlohmann::json{{"status", "success"}, {"id", id}}.dump(), "application/json");
+    } catch (const std::exception& e) {
+        LOG(ERROR, "Server") << "ERROR in handle_engine_update: " << e.what() << std::endl;
+        res.status = 500;
+        res.set_content(nlohmann::json{{"error", e.what()}}.dump(), "application/json");
+    }
+}
+
+void Server::handle_engine_delete(const httplib::Request& req, httplib::Response& res) {
+    if (req.method == "HEAD") { res.status = 200; return; }
+    try {
+        const std::string id = req.matches.size() > 1 ? req.matches[1].str() : "";
+        // "unregister" (default) drops the engine from the list: a custom_engines
+        // entry is removed, a scanned one is added to the ignore list. "delete"
+        // additionally removes the engine directory from disk.
+        const std::string mode = req.has_param("mode") ? req.get_param_value("mode") : "unregister";
+        if (id.empty()) {
+            res.status = 400;
+            res.set_content(nlohmann::json{{"error", "Missing engine id"}}.dump(), "application/json");
+            return;
+        }
+        if (mode != "unregister" && mode != "delete") {
+            res.status = 400;
+            res.set_content(
+                nlohmann::json{{"error", "mode must be 'unregister' or 'delete'"}}.dump(),
+                "application/json");
+            return;
+        }
+
+        nlohmann::json section = nlohmann::json::object();
+        if (auto* cfg = RuntimeConfig::global()) {
+            section = cfg->backend_config("llamacpp");
+        }
+
+        const bool registered = section.contains("custom_engines") &&
+            section["custom_engines"].is_object() && section["custom_engines"].contains(id);
+
+        // Resolve the on-disk directory, restricted to the managed roots: the
+        // scanned engines_dir and the downloaded backend directory. Never trust
+        // an arbitrary path from config for a recursive delete.
+        std::filesystem::path engine_dir;
+        std::error_code ec;
+        if (registered) {
+            const std::string path =
+                section["custom_engines"][id].value("path", std::string(""));
+            if (!path.empty()) {
+                engine_dir = lemon::utils::path_from_utf8(path).parent_path();
+            }
+        }
+        if (engine_dir.empty() && section.contains("engines_dir") && section["engines_dir"].is_string()) {
+            std::filesystem::path candidate =
+                lemon::utils::path_from_utf8(section["engines_dir"].get<std::string>()) / id;
+            if (std::filesystem::is_directory(candidate, ec)) engine_dir = candidate;
+        }
+        if (engine_dir.empty()) {
+            std::filesystem::path candidate =
+                std::filesystem::path(lemon::utils::get_downloaded_bin_dir()) / "llamacpp" / id;
+            if (std::filesystem::is_directory(candidate, ec)) engine_dir = candidate;
+        }
+
+        if (mode == "delete") {
+            if (engine_dir.empty()) {
+                res.status = 404;
+                res.set_content(
+                    nlohmann::json{{"error", "engine directory not found: " + id}}.dump(),
+                    "application/json");
+                return;
+            }
+            // The directory name must equal the engine id (direct child of a
+            // managed root), which blocks "../" traversal through the id.
+            if (engine_dir.filename().string() != id) {
+                res.status = 400;
+                res.set_content(
+                    nlohmann::json{{"error", "refusing to delete unmanaged path"}}.dump(),
+                    "application/json");
+                return;
+            }
+        }
+
+        nlohmann::json engines_map =
+            (section.contains("custom_engines") && section["custom_engines"].is_object())
+                ? section["custom_engines"] : nlohmann::json::object();
+        engines_map.erase(id);
+
+        nlohmann::json ignored = nlohmann::json::array();
+        if (section.contains("ignored_engines") && section["ignored_engines"].is_array()) {
+            for (const auto& item : section["ignored_engines"]) {
+                if (item.is_string() && item.get<std::string>() != id) ignored.push_back(item);
+            }
+        }
+        // Hiding applies to scanned engines, which are not in custom_engines.
+        // A file deletion needs no ignore entry because the scan won't find it.
+        if (mode == "unregister" && !registered && !engine_dir.empty()) {
+            ignored.push_back(id);
+        }
+
+        if (auto* cfg = RuntimeConfig::global()) {
+            cfg->set({{"llamacpp", {{"custom_engines", engines_map},
+                                    {"ignored_engines", ignored}}}},
+                     nullptr);
+        }
+        if (!config_dir_.empty()) {
+            try {
+                nlohmann::json user_cfg = ConfigFile::load_raw(config_dir_);
+                user_cfg["llamacpp"]["custom_engines"] = engines_map;
+                user_cfg["llamacpp"]["ignored_engines"] = ignored;
                 ConfigFile::save(config_dir_, user_cfg);
             } catch (const std::exception& e) {
                 LOG(WARNING, "Server") << "Failed to persist engine delete: " << e.what() << std::endl;
             }
         }
-        res.set_content(nlohmann::json{{"status", "success"}}.dump(), "application/json");
+
+        if (mode == "delete") {
+            std::error_code del_ec;
+            std::filesystem::remove_all(engine_dir, del_ec);
+            if (del_ec) {
+                res.status = 409;
+                res.set_content(
+                    nlohmann::json{{"error",
+                        "Failed to delete engine files (is it in use?): " + del_ec.message()}}.dump(),
+                    "application/json");
+                return;
+            }
+        }
+
+        res.set_content(
+            nlohmann::json{{"status", "success"}, {"mode", mode}, {"id", id}}.dump(),
+            "application/json");
     } catch (const std::exception& e) {
         LOG(ERROR, "Server") << "ERROR in handle_engine_delete: " << e.what() << std::endl;
         res.status = 500;

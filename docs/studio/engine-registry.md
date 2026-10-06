@@ -40,6 +40,7 @@ engines\
 ```jsonc
 "llamacpp": {
   "engines_dir": "…\\engines",         // 自动扫描的引擎目录（可选，默认仓库 engines/）
+  "ignored_engines": ["old_build"],    // 从列表移除但不删文件的引擎名（WebUI「移除列表」写入）
   "custom_engines": {
     "<引擎名>": {
       "path":    "engines\\<引擎名>\\llama-server.exe",
@@ -52,9 +53,13 @@ engines\
 ```
 
 - `env` 是**引擎级默认环境变量**，会被启动时注入；`roc_strixllama_env` 这类"烘焙版"引擎
-  自身已带默认值，这里可用 `env` 覆盖。
-- 引擎更新/新增后，WebUI「引擎列表」会合并显示已登记项与扫描发现项；**删除自编引擎**只从
-  `custom_engines` 移除，不动磁盘文件。
+  自身已带默认值，这里可用 `env` 覆盖。WebUI「引擎配置」可编辑 backend / device / env。
+- 引擎更新/新增后，WebUI「引擎列表」会合并显示已登记项与扫描发现项：
+  - **移除列表**（`DELETE /engines/{id}?mode=unregister`）：自编引擎从 `custom_engines` 移除，
+    扫描到的引擎写入 `ignored_engines`（不动磁盘文件）。
+  - **删除文件**（`DELETE /engines/{id}?mode=delete`）：删除受管目录（`engines_dir/<id>`）下的文件，
+    仅允许删除 `engines_dir` 或下载目录下的直接子目录。
+  - 下载得到的引擎（`source=downloaded`）通过 `POST /uninstall` 卸载、`POST /install` 更新。
 
 ## 按模型选引擎（`config/recipe_options.json`）
 

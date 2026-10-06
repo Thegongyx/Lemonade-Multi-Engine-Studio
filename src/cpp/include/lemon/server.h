@@ -112,7 +112,9 @@ private:
     // and expose one build's `llama-server --help` catalog as structured JSON.
     void handle_engines(const httplib::Request& req, httplib::Response& res);
     void handle_engine_params(const httplib::Request& req, httplib::Response& res);
+    void handle_engine_version(const httplib::Request& req, httplib::Response& res);
     void handle_engine_add(const httplib::Request& req, httplib::Response& res);
+    void handle_engine_update(const httplib::Request& req, httplib::Response& res);
     void handle_engine_delete(const httplib::Request& req, httplib::Response& res);
     // Local model roots: list/scan multiple directories of GGUF models.
     void handle_model_paths_get(const httplib::Request& req, httplib::Response& res);

@@ -25,6 +25,19 @@ export type EngineInfo = {
   // can tell whether an engine is usable for a given model.
   recipe?: string;
   exists: boolean;
+  // Capabilities reported by GET /engines. A scanned engine can be registered
+  // or hidden; a downloaded one is updated/uninstalled through the backend
+  // flow. `backend_ref` is the system-info backend name to pass to /install.
+  can_register?: boolean;
+  can_hide?: boolean;
+  can_delete_files?: boolean;
+  can_uninstall?: boolean;
+  update_available?: boolean;
+  backend_ref?: string;
+  state?: string;
+  latest_version?: string;
+  release_url?: string;
+  env?: Record<string, string>;
 };
 
 export type EngineParam = {
@@ -44,7 +57,13 @@ export type ModelInfo = {
   port?: number;
   size?: number;
   downloaded?: boolean;
+  update_available?: boolean;
+  suggested?: boolean;
+  source?: string;
+  labels?: string[];
   recipe?: string;
+  max_context_window?: number;
+  context_length?: number;
   recipe_options?: Record<string, unknown>;
 };
 
@@ -119,10 +138,26 @@ function apiKey(): string {
   return localStorage.getItem("apiKey") || "lemonade";
 }
 
-async function req<T>(path: string, init?: RequestInit): Promise<T> {
+// Optional remote base URL (e.g. "http://192.168.1.5:13310"). Empty means the
+// page origin, i.e. the local service.
+function serverBase(): string {
+  const b = localStorage.getItem("serverBaseUrl") || "";
+  return b.trim().replace(/\/$/, "");
+}
+
+export function apiUrl(path: string): string {
   // /internal/* endpoints are registered at the server root (not quad-prefixed),
   // so they must bypass the /api/v1 prefix.
-  const url = path.startsWith("/internal") ? path : `/api/v1${path}`;
+  const p = path.startsWith("/internal") ? path : `/api/v1${path}`;
+  return `${serverBase()}${p}`;
+}
+
+export function apiAuthKey(): string {
+  return apiKey();
+}
+
+async function req<T>(path: string, init?: RequestInit): Promise<T> {
+  const url = apiUrl(path);
   let res: Response;
   try {
     res = await fetch(url, {
@@ -145,6 +180,40 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   }
   return (await res.json()) as T;
 }
+
+export type BackendInfo = {
+  name?: string;
+  state?: string;
+  message?: string;
+  action?: string;
+  version?: string;
+  release_url?: string;
+  download_filename?: string;
+  download_size_mb?: number;
+  download_size_bytes?: number;
+  can_uninstall?: boolean;
+};
+
+export type Recipe = {
+  recipe?: string;
+  default_backend?: string;
+  backends?: Record<string, BackendInfo>;
+};
+
+export type SystemInfo = {
+  recipes?: Record<string, Recipe>;
+  unavailable_recipes?: string[];
+  model_storage?: {
+    total_size?: number;
+    model_count?: number;
+    total_size_gb?: number;
+    [key: string]: unknown;
+  };
+  devices?: Record<string, unknown>;
+  OS_Version?: string;
+  processor?: string;
+  [key: string]: unknown;
+};
 
 export const api = {
   listEngines: () => req<{ engines: EngineInfo[] }>("/engines"),
@@ -192,10 +261,35 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ path }),
     }),
-  removeEngine: (id: string) =>
-    req<{ status: string }>(`/engines/${encodeURIComponent(id)}`, { method: "DELETE" }),
-  systemInfo: () =>
-    req<{ recipes?: Record<string, { backends?: Record<string, { state?: string }> }> }>("/system-info"),
+  // mode "unregister" hides/removes the engine from the list; "delete" also
+  // removes its directory from disk.
+  deleteEngine: (id: string, mode: "unregister" | "delete" = "unregister") =>
+    req<{ status: string }>(`/engines/${encodeURIComponent(id)}?mode=${mode}`, { method: "DELETE" }),
+  updateEngine: (id: string, body: { backend?: string; device?: string; env?: Record<string, string> | null }) =>
+    req<{ status: string; id: string }>(`/engines/${encodeURIComponent(id)}`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  engineVersion: (id: string) =>
+    req<{ engine: string; version: string; raw: string }>(
+      `/engines/${encodeURIComponent(id)}/version`,
+    ),
+  systemInfo: () => req<SystemInfo>("/system-info"),
+  systemStats: () => req<Record<string, unknown>>("/system-stats"),
+  deleteModel: (id: string) =>
+    req<{ status: string; message?: string }>("/delete", {
+      method: "POST",
+      body: JSON.stringify({ model: id, model_name: id }),
+    }),
+  checkModelUpdates: () =>
+    req<{ status: string; updates_available: number; models: string[]; failed_models: string[] }>(
+      "/models/check-updates",
+      { method: "POST" },
+    ),
+  resetModelOptions: (id: string) =>
+    req<Record<string, unknown>>(`/models/${encodeURIComponent(id)}/options`, { method: "DELETE" }),
+  modelFiles: (id: string) =>
+    req<{ files?: unknown[]; [key: string]: unknown }>(`/models/${encodeURIComponent(id)}/files`),
   installBackend: (recipe: string, backend: string) =>
     req<Record<string, unknown>>("/install", {
       method: "POST",

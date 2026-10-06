@@ -1,18 +1,28 @@
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
-import { Boxes, Cpu, SlidersHorizontal, Globe, MessageSquare } from "lucide-react";
+import { Boxes, Cpu, SlidersHorizontal, Globe, MessageSquare, Settings, Sun, Moon } from "lucide-react";
 import EnginesPage from "./pages/EnginesPage";
 import ModelsPage from "./pages/ModelsPage";
 import ChatPage from "./pages/ChatPage";
 import RuntimePage from "./pages/RuntimePage";
+import SettingsPage from "./pages/SettingsPage";
 
 function Sidebar() {
   const { t, i18n } = useTranslation();
+  const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "dark");
+  const toggleTheme = () => {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    localStorage.setItem("theme", next);
+    document.documentElement.setAttribute("data-theme", next);
+  };
   const nav = [
     { to: "/models", label: t("nav.models"), icon: <SlidersHorizontal size={17} /> },
     { to: "/chat", label: t("nav.chat"), icon: <MessageSquare size={17} /> },
     { to: "/engines", label: t("nav.engines"), icon: <Boxes size={17} /> },
     { to: "/runtime", label: t("nav.runtime"), icon: <Cpu size={17} /> },
+    { to: "/settings", label: t("nav.settings"), icon: <Settings size={17} /> },
   ];
   const toggleLang = () => {
     const next = i18n.language.startsWith("zh") ? "en" : "zh";
@@ -39,12 +49,19 @@ function Sidebar() {
           <Globe size={15} />
           {i18n.language.startsWith("zh") ? "中文" : "EN"}
         </button>
+        <button className="btn ghost sm" onClick={toggleTheme} title={t("settings.theme")}>
+          {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
+        </button>
       </div>
     </aside>
   );
 }
 
 export default function App() {
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", localStorage.getItem("theme") || "dark");
+  }, []);
+
   return (
     <div className="app">
       <Sidebar />
@@ -55,6 +72,7 @@ export default function App() {
           <Route path="/models" element={<ModelsPage />} />
           <Route path="/chat" element={<ChatPage />} />
           <Route path="/runtime" element={<RuntimePage />} />
+          <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </main>
     </div>

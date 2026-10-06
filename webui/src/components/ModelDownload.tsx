@@ -115,7 +115,11 @@ export default function ModelDownload({ onPulled }: { onPulled?: () => void }) {
                 <Fragment key={repo}>
                   <tr className="param-row" onClick={() => toggleVariants(repo)}>
                     <td>{open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}</td>
-                    <td><strong>{repo}</strong></td>
+                    <td>
+                      <div className="cell-truncate" title={repo}>
+                        <strong>{repo}</strong>
+                      </div>
+                    </td>
                     <td>{r.has_gguf ? <span className="tag ok">gguf</span> : <span className="tag">—</span>}</td>
                     <td className="mono">{r.downloads ?? "—"}</td>
                   </tr>
@@ -139,9 +143,13 @@ export default function ModelDownload({ onPulled }: { onPulled?: () => void }) {
                               {variants.variants!.map((v) => (
                                 <tr key={v.name}>
                                   <td><strong>{v.name}</strong></td>
-                                  <td className="mono">{v.primary_file || (v.files || []).join(", ")}</td>
+                                  <td className="mono">
+                                    <span className="cell-truncate" title={v.primary_file || (v.files || []).join(", ")}>
+                                      {v.primary_file || (v.files || []).join(", ")}
+                                    </span>
+                                  </td>
                                   <td className="mono">{gb(v.size_bytes)}</td>
-                                  <td>
+                                  <td className="col-actions">
                                     <button
                                       className="btn sm primary"
                                       disabled={pulling === `${repo}:${v.name}`}

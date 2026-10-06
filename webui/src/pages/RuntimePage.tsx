@@ -1,9 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { RefreshCw, Copy, Save } from "lucide-react";
-import { api } from "../api";
+import { RefreshCw, Copy, Save, Cpu, MemoryStick, HardDrive } from "lucide-react";
+import { api, type SystemInfo } from "../api";
 
 type LoadedEntry = { model_name?: string; backend_url?: string; status?: string; loaded?: boolean };
+
+const fmtBytes = (n?: number | null) => {
+  if (typeof n !== "number" || !Number.isFinite(n) || n <= 0) return "—";
+  if (n >= 1024 ** 3) return `${(n / 1024 ** 3).toFixed(1)} GB`;
+  if (n >= 1024 ** 2) return `${(n / 1024 ** 2).toFixed(1)} MB`;
+  return `${n} B`;
+};
 
 type FieldType = "int" | "float" | "bool" | "text" | "select";
 
@@ -32,6 +39,7 @@ const FIELDS: Field[] = [
   { key: "offline", group: "network", type: "bool" },
   { key: "default_model_source", group: "storage", type: "select", options: ["huggingface", "modelscope"] },
   { key: "models_dir", group: "storage", type: "text" },
+  { key: "llamacpp.engines_dir", group: "storage", type: "text" },
   { key: "download_rate_limit", group: "storage", type: "text" },
   { key: "auto_check_model_updates", group: "storage", type: "bool" },
   { key: "auto_update_models", group: "storage", type: "bool" },
@@ -78,6 +86,7 @@ export default function RuntimePage() {
   const [loaded, setLoaded] = useState<LoadedEntry[]>([]);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [sys, setSys] = useState<SystemInfo | null>(null);
 
   const [cfg, setCfg] = useState<Json>({});
   const [defaults, setDefaults] = useState<Json>({});
@@ -99,6 +108,7 @@ export default function RuntimePage() {
         setLoaded(arr as LoadedEntry[]);
       })
       .catch((e) => setError(String(e)));
+    api.systemInfo().then(setSys).catch(() => {});
   };
 
   const loadConfig = () => {
@@ -157,6 +167,15 @@ export default function RuntimePage() {
 
   const label = (f: Field) => t(`runtime.fields.${f.key.replace(/\./g, "_")}`);
 
+  const devices = (sys?.devices ?? {}) as Record<string, any>;
+  const cpu = devices.cpu as { name?: string; cores?: number; threads?: number } | undefined;
+  const gpus: Array<{ name?: string; vram_gb?: number; virtual_mem_gb?: number; driver_version?: string; family?: string; integrated?: boolean }> = [
+    ...(Array.isArray(devices.amd_gpu) ? devices.amd_gpu : []),
+    ...(Array.isArray(devices.nvidia_gpu) ? devices.nvidia_gpu : []),
+  ];
+  const npu = devices.amd_npu as { name?: string; available?: boolean; family?: string; tops_max_int?: number } | undefined;
+  const storage = sys?.model_storage as { used_bytes?: number; total_bytes?: number; free_bytes?: number; error?: string } | undefined;
+
   return (
     <>
       <div className="page-head">
@@ -175,6 +194,63 @@ export default function RuntimePage() {
           </button>
         </div>
       </div>
+
+      {sys && (
+        <div className="card">
+          <h3>{t("runtime.hardware")}</h3>
+          <div className="hw-grid">
+            <div className="hw-row">
+              <Cpu size={15} />
+              <span className="hw-label">{t("runtime.cpu")}</span>
+              <span className="mono">
+                {cpu?.name || String(sys.Processor ?? "—")}
+                {cpu?.cores ? ` · ${cpu.cores}C/${cpu.threads}T` : ""}
+              </span>
+            </div>
+            <div className="hw-row">
+              <MemoryStick size={15} />
+              <span className="hw-label">{t("runtime.memory")}</span>
+              <span className="mono">{String(sys["Physical Memory"] || "—")}</span>
+            </div>
+            {gpus.map((g, i) => (
+              <div className="hw-row" key={`gpu-${i}`}>
+                <Cpu size={15} />
+                <span className="hw-label">
+                  {t("runtime.gpu")} {i + 1}
+                  {g.integrated ? ` (${t("runtime.igpu")})` : ""}
+                </span>
+                <span className="mono">
+                  {g.name || "—"}
+                  {g.vram_gb ? ` · ${g.vram_gb} GB` : ""}
+                  {g.virtual_mem_gb ? ` (+${g.virtual_mem_gb} GB GTT)` : ""}
+                  {g.family ? ` · ${g.family}` : ""}
+                </span>
+              </div>
+            ))}
+            {npu?.available && (
+              <div className="hw-row">
+                <Cpu size={15} />
+                <span className="hw-label">{t("runtime.npu")}</span>
+                <span className="mono">
+                  {npu.name || "—"}
+                  {npu.tops_max_int ? ` · ${npu.tops_max_int} TOPS` : ""}
+                  {npu.family ? ` · ${npu.family}` : ""}
+                </span>
+              </div>
+            )}
+            {storage && !storage.error && (
+              <div className="hw-row">
+                <HardDrive size={15} />
+                <span className="hw-label">{t("runtime.storage")}</span>
+                <span className="mono">
+                  {t("runtime.used")} {fmtBytes(storage.used_bytes)} / {fmtBytes(storage.total_bytes)}
+                  {typeof storage.free_bytes === "number" ? ` · ${t("runtime.free")} ${fmtBytes(storage.free_bytes)}` : ""}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="card">
         <div className="row between" style={{ marginBottom: 10 }}>
@@ -197,7 +273,11 @@ export default function RuntimePage() {
             <tbody>
               {loaded.map((m) => (
                 <tr key={m.model_name || m.backend_url}>
-                  <td><strong>{m.model_name || "—"}</strong></td>
+                  <td>
+                    <div className="cell-truncate" title={m.model_name || ""}>
+                      <strong>{m.model_name || "—"}</strong>
+                    </div>
+                  </td>
                   <td className="mono">{portOf(m.backend_url)}</td>
                   <td>{m.status === "ready" || m.loaded ? <span className="tag ok">{t("runtime.running")}</span> : <span className="tag">{m.status || "—"}</span>}</td>
                 </tr>

@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Send, ScrollText, X, RefreshCw, Square } from "lucide-react";
-import { api, type ModelInfo, type ModelTelemetry, type Stats } from "../api";
+import { Send, ScrollText, X, RefreshCw, Square, Trash2, SlidersHorizontal } from "lucide-react";
+import { api, apiUrl, type ModelInfo, type ModelTelemetry, type Stats } from "../api";
+import MarkdownContent from "../components/MarkdownContent";
+import { useLogStream } from "../utils/logStream";
 
 type Msg = {
   role: "user" | "assistant";
@@ -9,7 +11,6 @@ type Msg = {
   model?: string;
   stats?: ModelTelemetry;
 };
-type LogLine = { timestamp: string; severity: string; tag: string; line: string };
 
 const apiKey = () => localStorage.getItem("apiKey") || "lemonade";
 
@@ -54,13 +55,25 @@ export default function ChatPage() {
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [running, setRunning] = useState<Set<string>>(new Set());
   const [model, setModel] = useState("");
-  const [messages, setMessages] = useState<Msg[]>([]);
+  const [messages, setMessages] = useState<Msg[]>(() => {
+    try {
+      const raw = localStorage.getItem("chat.messages");
+      return raw ? (JSON.parse(raw) as Msg[]) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [systemPrompt, setSystemPrompt] = useState(() => localStorage.getItem("chat.system") || "");
+  const [temperature, setTemperature] = useState(() => localStorage.getItem("chat.temperature") || "");
+  const [topP, setTopP] = useState(() => localStorage.getItem("chat.topP") || "");
+  const [showParams, setShowParams] = useState(false);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState("");
   const [logsOpen, setLogsOpen] = useState(false);
-  const [logs, setLogs] = useState<LogLine[]>([]);
   const [autoLog, setAutoLog] = useState(true);
+  const logStream = useLogStream(logsOpen && autoLog);
+  const logs = logStream.lines;
   const [totals, setTotals] = useState<Stats | null>(null);
 
   const logBox = useRef<HTMLDivElement>(null);
@@ -107,20 +120,21 @@ export default function ChatPage() {
   }, []);
 
   useEffect(() => {
-    if (!logsOpen) return;
-    const loadLogs = () => api.logs(300).then((r) => setLogs(r.lines || [])).catch(() => {});
-    loadLogs();
-    if (!autoLog) return;
-    const id = setInterval(loadLogs, 2000);
-    return () => clearInterval(id);
-  }, [logsOpen, autoLog]);
-
-  useEffect(() => {
     if (logBox.current) logBox.current.scrollTop = logBox.current.scrollHeight;
   }, [logs]);
   useEffect(() => {
     if (chatBox.current) chatBox.current.scrollTop = chatBox.current.scrollHeight;
   }, [messages]);
+
+  useEffect(() => {
+    localStorage.setItem("chat.messages", JSON.stringify(messages));
+  }, [messages]);
+
+  useEffect(() => {
+    localStorage.setItem("chat.system", systemPrompt);
+    localStorage.setItem("chat.temperature", temperature);
+    localStorage.setItem("chat.topP", topP);
+  }, [systemPrompt, temperature, topP]);
 
   const stop = () => {
     abortRef.current?.abort();
@@ -139,10 +153,19 @@ export default function ChatPage() {
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      const res = await fetch("/api/v1/chat/completions", {
+      const sys = systemPrompt.trim()
+        ? [{ role: "system", content: systemPrompt.trim() }]
+        : [];
+      const apiMessages = [...sys, ...history.map((m) => ({ role: m.role, content: m.content }))];
+      const body: Record<string, unknown> = { model: sentModel, messages: apiMessages, stream: true };
+      const temp = Number(temperature);
+      if (temperature.trim() !== "" && Number.isFinite(temp)) body.temperature = temp;
+      const tp = Number(topP);
+      if (topP.trim() !== "" && Number.isFinite(tp)) body.top_p = tp;
+      const res = await fetch(apiUrl("/chat/completions"), {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey()}` },
-        body: JSON.stringify({ model: sentModel, messages: history, stream: true }),
+        body: JSON.stringify(body),
         signal: controller.signal,
       });
       if (!res.ok || !res.body) {
@@ -250,10 +273,54 @@ export default function ChatPage() {
           <button className="btn" style={{ height: 38 }} onClick={loadModels}>
             <RefreshCw size={15} /> {t("common.refresh")}
           </button>
+          <button
+            className={`btn${showParams ? " primary" : ""}`}
+            style={{ height: 38 }}
+            onClick={() => setShowParams((v) => !v)}
+          >
+            <SlidersHorizontal size={15} /> {t("chat.params")}
+          </button>
+          <button
+            className="btn"
+            style={{ height: 38 }}
+            onClick={() => setMessages([])}
+            disabled={messages.length === 0}
+            title={t("chat.clear")}
+          >
+            <Trash2 size={15} />
+          </button>
           <button className="btn" style={{ height: 38 }} onClick={() => setLogsOpen((v) => !v)}>
             <ScrollText size={15} /> {logsOpen ? t("chat.hideLogs") : t("chat.showLogs")}
           </button>
         </div>
+        {showParams && (
+          <div className="chat-params">
+            <label className="field">
+              <span>{t("chat.system")}</span>
+              <textarea
+                value={systemPrompt}
+                onChange={(e) => setSystemPrompt(e.target.value)}
+                placeholder={t("chat.systemPlaceholder")}
+                rows={2}
+              />
+            </label>
+            <div className="row">
+              <label className="field" style={{ flex: 1 }}>
+                <span>{t("chat.temperature")}</span>
+                <input
+                  className="mono"
+                  value={temperature}
+                  onChange={(e) => setTemperature(e.target.value)}
+                  placeholder="0.7"
+                />
+              </label>
+              <label className="field" style={{ flex: 1 }}>
+                <span>{t("chat.topP")}</span>
+                <input className="mono" value={topP} onChange={(e) => setTopP(e.target.value)} placeholder="0.95" />
+              </label>
+            </div>
+          </div>
+        )}
         {totals && totals.request_count_total > 0 && (
           <div className="chat-stats mono" style={{ marginTop: 8 }}>
             <span>
@@ -305,7 +372,13 @@ export default function ChatPage() {
             {messages.map((m, i) => (
               <div key={i} className={`chat-msg ${m.role}`}>
                 <div className="chat-role">{m.role === "user" ? t("chat.you") : m.model || model}</div>
-                <div className="chat-text">{m.content || (streaming ? "…" : "")}</div>
+                <div className="chat-text">
+                  {m.role === "assistant" && m.content ? (
+                    <MarkdownContent content={m.content} />
+                  ) : (
+                    m.content || (streaming ? "…" : "")
+                  )}
+                </div>
                 {m.stats && <StatLine s={m.stats} />}
               </div>
             ))}

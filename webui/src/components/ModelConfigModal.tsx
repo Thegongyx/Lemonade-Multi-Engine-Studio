@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { X, Save, Wand2, FileText, Wrench } from "lucide-react";
+import { X, Save, Wand2, FileText, Wrench, RotateCcw } from "lucide-react";
 import { api, type EngineInfo, type EngineParam } from "../api";
 import ParamsModal from "./ParamsModal";
 import { defaultEnvFor } from "../engineDefaultEnv";
+import { useConfirmDialog } from "./ConfirmDialog";
 
 type BuilderParam = { flag: string; value: string; type: EngineParam["type"] };
 
@@ -40,6 +41,7 @@ export default function ModelConfigModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
+  const { confirm, ConfirmHost } = useConfirmDialog();
 
   useEffect(() => {
     api
@@ -124,6 +126,36 @@ export default function ModelConfigModal({
   };
 
   const selected = engines.find((e) => e.id === engine);
+
+  const reset = async () => {
+    const ok = await confirm({
+      title: t("models.resetTitle"),
+      message: t("models.confirmReset", { name: modelId }),
+      confirmText: t("models.reset"),
+      cancelText: t("common.cancel"),
+      danger: true,
+    });
+    if (!ok) return;
+    setSaving(true);
+    setError("");
+    try {
+      await api.resetModelOptions(modelId);
+      setEngine("");
+      setArgsText("");
+      setEnvText("");
+      setEnvDirty(false);
+      setBuilder([]);
+      setCtxSize("");
+      setPrefillChunk("");
+      setToast(t("models.resetDone"));
+      onSaved();
+      setTimeout(() => setToast(""), 1500);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -262,6 +294,9 @@ export default function ModelConfigModal({
         <div className="modal-foot">
           <span className="hint">{selected ? `${selected.name} → ${selected.path}` : ""}</span>
           <div className="row">
+            <button className="btn ghost" onClick={reset} disabled={saving} title={t("models.reset")}>
+              <RotateCcw size={14} /> {t("models.reset")}
+            </button>
             <button className="btn ghost" onClick={onClose}>
               {t("common.cancel")}
             </button>
@@ -276,6 +311,7 @@ export default function ModelConfigModal({
         <ParamsModal engineId={engine} engineLabel={engine} onClose={() => setShowParams(false)} onAdd={addParams} />
       )}
       {toast && <div className="toast">{toast}</div>}
+      <ConfirmHost />
     </div>
   );
 }

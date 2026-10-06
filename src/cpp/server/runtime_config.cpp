@@ -1179,6 +1179,16 @@ void RuntimeConfig::validate_backend(const std::string& backend, const std::stri
             throw std::invalid_argument("'" + backend + "." + key + "' must be a string");
         }
     }
+    else if (key == "ignored_engines") {
+        if (!value.is_array()) {
+            throw std::invalid_argument("'" + backend + "." + key + "' must be an array of strings");
+        }
+        for (const auto& item : value) {
+            if (!item.is_string()) {
+                throw std::invalid_argument("'" + backend + "." + key + "' must contain only strings");
+            }
+        }
+    }
     else {
         throw std::invalid_argument("Unknown key: '" + backend + "." + key + "'");
     }
