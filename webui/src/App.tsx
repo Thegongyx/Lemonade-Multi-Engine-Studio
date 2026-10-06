@@ -10,9 +10,9 @@ import SettingsPage from "./pages/SettingsPage";
 
 function Sidebar() {
   const { t, i18n } = useTranslation();
-  const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "dark");
+  const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "light");
   const toggleTheme = () => {
-    const next = theme === "dark" ? "light" : "dark";
+    const next = theme === "light" ? "dark" : "light";
     setTheme(next);
     localStorage.setItem("theme", next);
     document.documentElement.setAttribute("data-theme", next);
@@ -63,7 +63,7 @@ export default function App() {
     const urlTheme = new URLSearchParams(window.location.search).get("theme");
     const theme = urlTheme === "light" || urlTheme === "dark"
       ? urlTheme
-      : (localStorage.getItem("theme") || "dark");
+      : (localStorage.getItem("theme") || "light");
     if (urlTheme === "light" || urlTheme === "dark") localStorage.setItem("theme", urlTheme);
     document.documentElement.setAttribute("data-theme", theme);
   }, []);
