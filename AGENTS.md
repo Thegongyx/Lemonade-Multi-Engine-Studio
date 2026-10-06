@@ -194,3 +194,29 @@ These MUST be maintained in all changes:
 8. **Web-app dependencies constrained by Debian native packaging** — `src/web-app/package.json` is kept separate from `src/app/package.json` because the native Debian package (`lemonade-server` .deb) must build using only npm modules available in Debian's `/usr/share/nodejs` (see `USE_SYSTEM_NODEJS_MODULES` in `src/web-app/webpack.config.js`). The old Electron app depended on packages Debian does not ship. Do NOT consolidate the two `package.json` files — the split is required for reproducible distro packaging.
 9. **Desktop app is on-demand; `lemond` runs independently** — On Windows, `LemonadeServer.exe` (which embeds `lemond` + tray icon) is the always-on process, auto-started via the Windows startup folder. The Tauri desktop app (`lemonade-app.exe`) is opened on demand when the user wants the UI and must not be added to startup. The desktop app must not embed or manage `lemond`'s lifecycle — it discovers the already-running server (UDP beacon for local, explicit base URL for remote) and speaks to it over HTTP.
 10. **Quad-prefix registration** — Every new endpoint MUST be registered under `/api/v0/`, `/api/v1/`, `/v0/`, AND `/v1/`. Documented exceptions: Ollama (`/api/*` without version prefix), Anthropic (`POST /v1/messages` only), and MCP (`POST /mcp`) — each of those protocols mandates a fixed URL shape that conflicts with the quad-prefix scheme.
+
+## Local Dev Environment (Windows)
+
+### GitHub push requires the local proxy
+
+Pushing to `github.com:443` is blocked on this machine unless it goes through the local
+**Steam++ (Watt)** accelerator proxy. `git` does not read the system PAC, so a plain
+`git push` fails with `Failed to connect to github.com:443` (~21s timeout) even though
+browsers work. PowerShell's `Invoke-RestMethod`/`Invoke-WebRequest` **do** honour the PAC,
+which is why the GitHub REST API works without extra config.
+
+The proxy port changes each time Steam++ starts. Read it from the PAC URL and push with a
+temporary `-c` (never persist it globally, since the port moves):
+
+```powershell
+$pac  = (Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings').AutoConfigURL
+$port = ([regex]'127\.0\.0\.1:(\d+)').Match($pac).Groups[1].Value   # e.g. 26561
+git -c http.proxy=http://127.0.0.1:$port -c https.proxy=http://127.0.0.1:$port push origin main
+```
+
+`Invoke-RestMethod`/`Invoke-WebRequest` need no explicit proxy, so the GitHub REST API —
+including uploading/replacing release assets on `uploads.github.com` — runs directly from
+PowerShell. A successful local `git commit` is already on disk; a failed push loses nothing.
+
+> Historical note: the older machine-level notes (Steam++/PAC discovery, HF mirror,
+> toolchain paths) live in `C:\xiangmu\lemonade\AGENTS.md`.
