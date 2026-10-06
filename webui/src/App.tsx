@@ -10,7 +10,7 @@ import SettingsPage from "./pages/SettingsPage";
 
 function Sidebar() {
   const { t, i18n } = useTranslation();
-  const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "light");
+  const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "dark");
   const toggleTheme = () => {
     const order = ["light", "dark", "nordic", "film"];
     const next = order[(order.indexOf(theme) + 1) % order.length];
@@ -63,7 +63,7 @@ export default function App() {
     // ?theme=light|dark overrides the saved preference (also handy for testing).
     const urlTheme = new URLSearchParams(window.location.search).get("theme");
     const valid = urlTheme === "light" || urlTheme === "dark" || urlTheme === "nordic" || urlTheme === "film";
-    const theme = valid ? urlTheme! : (localStorage.getItem("theme") || "light");
+    const theme = valid ? urlTheme! : (localStorage.getItem("theme") || "dark");
     if (valid) localStorage.setItem("theme", urlTheme!);
     document.documentElement.setAttribute("data-theme", theme);
   }, []);

@@ -7,7 +7,7 @@ export default function SettingsPage() {
   const { t } = useTranslation();
   const [apiKey, setApiKey] = useState(localStorage.getItem("apiKey") || "lemonade");
   const [baseUrl, setBaseUrl] = useState(localStorage.getItem("serverBaseUrl") || "");
-  const [theme, setTheme] = useState(localStorage.getItem("theme") || "light");
+  const [theme, setTheme] = useState(localStorage.getItem("theme") || "dark");
   const [testMsg, setTestMsg] = useState("");
   const [testing, setTesting] = useState(false);
   const [saved, setSaved] = useState(false);

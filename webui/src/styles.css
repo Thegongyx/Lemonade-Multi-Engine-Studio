@@ -646,23 +646,24 @@ td.mono { white-space: nowrap; }
   --surface-2: #242e3d;
   --surface-sunken: #0d121a;
 
-  --text: #f4f4f5;
-  --text-dim: #d1d5db;
-  --text-muted: #9ca3af;
-  --text-light: #6b7280;
+  /* Cinematic teal-and-orange grade: gold "projector" accent, teal support,
+     warm off-white text, cinema red for destructive. */
+  --text: #f2ede3;
+  --text-dim: #d3cbbd;
+  --text-muted: #a79d8c;
+  --text-light: #79715f;
 
-  --border: #374151;
+  --border: #333b48;
 
-  /* Monochrome: white "projector light" accent, film-border grey secondary. */
-  --accent: #e5e7eb;
-  --accent-strong: #ffffff;
-  --accent-soft: rgba(229, 231, 235, 0.12);
-  --accent-2: #9ca3af;
-  --accent-2-soft: rgba(156, 163, 175, 0.18);
-  --on-accent: #0b0f16;
-  --ok: #6fae8c;
-  --warn: #c9a45c;
-  --err: #c97b7b;
+  --accent: #f0b429;
+  --accent-strong: #ffca4d;
+  --accent-soft: rgba(240, 180, 41, 0.14);
+  --accent-2: #3fb8a8;
+  --accent-2-soft: rgba(63, 184, 168, 0.16);
+  --on-accent: #1a1206;
+  --ok: #4db6a0;
+  --warn: #e39a3b;
+  --err: #d9534f;
 
   --nm-dark: rgba(0, 0, 0, 0.6);
   --nm-light: rgba(255, 255, 255, 0.04);
@@ -673,7 +674,7 @@ td.mono { white-space: nowrap; }
   --nm-inset-sm: inset 0 0 0 1px var(--border);
   --nm-press: inset 0 0 0 1px var(--accent);
   --shadow: 0 8px 30px rgba(0, 0, 0, 0.50);
-  --shadow-accent: 0 8px 22px rgba(255, 255, 255, 0.18);
+  --shadow-accent: 0 8px 22px rgba(240, 180, 41, 0.30);
 
   --radius-card: 6px;
   --radius: 4px;
@@ -725,9 +726,9 @@ td.mono { white-space: nowrap; }
 }
 :root[data-theme="film"] .nav-item.active svg { color: var(--accent); }
 :root[data-theme="film"] .brand .logo {
-  background: linear-gradient(145deg, #ffffff, #9ca3af);
-  color: #0b0f16;
-  box-shadow: 0 6px 18px rgba(255, 255, 255, 0.18);
+  background: linear-gradient(145deg, #ffca4d, #d98b2b);
+  color: #1a1206;
+  box-shadow: 0 6px 18px rgba(240, 180, 41, 0.30);
 }
 :root[data-theme="film"] .tabs {
   background: transparent; box-shadow: none; border-radius: 0; padding: 0; gap: 4px;
@@ -736,6 +737,10 @@ td.mono { white-space: nowrap; }
 :root[data-theme="film"] .tab { border-radius: 0; border-bottom: 2px solid transparent; letter-spacing: .04em; }
 :root[data-theme="film"] .tab.active { background: transparent; box-shadow: none; color: var(--text); border-bottom-color: var(--accent); }
 :root[data-theme="film"] .page-head h2 { text-transform: uppercase; letter-spacing: .08em; font-weight: 800; }
+:root[data-theme="film"] .page-head h2::after {
+  content: ""; display: block; width: 46px; height: 3px; margin-top: 10px; border-radius: 2px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+}
 :root[data-theme="film"] .card { background: var(--surface); }
-/* Film-style progress: white "light" fill. */
-:root[data-theme="film"] .progress-fill { background: linear-gradient(90deg, #ffffff, #9ca3af); }
+/* Film-style progress: gold-to-teal "light" fill. */
+:root[data-theme="film"] .progress-fill { background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
