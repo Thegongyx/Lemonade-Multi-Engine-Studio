@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Save, Plug, Sun, Moon } from "lucide-react";
+import { Save, Plug, Sun, Moon, TreePine } from "lucide-react";
 import { api } from "../api";
 
 export default function SettingsPage() {
@@ -72,17 +72,14 @@ export default function SettingsPage() {
         <label className="field">
           <span>{t("settings.theme")}</span>
           <div className="row">
-            <button
-              className={`btn sm${theme === "dark" ? " primary" : ""}`}
-              onClick={() => setTheme("dark")}
-            >
+            <button className={`btn sm${theme === "light" ? " primary" : ""}`} onClick={() => setTheme("light")}>
+              <Sun size={14} /> {t("settings.light")}
+            </button>
+            <button className={`btn sm${theme === "dark" ? " primary" : ""}`} onClick={() => setTheme("dark")}>
               <Moon size={14} /> {t("settings.dark")}
             </button>
-            <button
-              className={`btn sm${theme === "light" ? " primary" : ""}`}
-              onClick={() => setTheme("light")}
-            >
-              <Sun size={14} /> {t("settings.light")}
+            <button className={`btn sm${theme === "nordic" ? " primary" : ""}`} onClick={() => setTheme("nordic")}>
+              <TreePine size={14} /> {t("settings.nordic")}
             </button>
           </div>
         </label>
