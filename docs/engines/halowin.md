@@ -28,7 +28,7 @@ Lemonade 负责拉起两者、探活、按模型路由与清理。
 lemonade backends install halowin:win
 ```
 
-默认从 GitHub Release `v0.0.5` 下载 `releases-windows.zip`（约 70 MB），解压到
+默认从 GitHub Release `v0.0.6` 下载 `releases-windows.zip`（约 70 MB），解压到
 `<cache>\bin\halowin\win\`。自编译引擎可改为在 `config.json` 里指定目录：
 
 ```jsonc
