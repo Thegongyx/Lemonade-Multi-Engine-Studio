@@ -9,10 +9,10 @@ namespace halowin {
 // The halowin backend descriptor (plain data). Header-only `inline const` so it
 // links into both the lemonade CLI and lemond without a separate source file.
 //
-// Wraps gfx1151-engine (gdec + gdec-api), a gfx1151-specific MoE inference
-// engine. Models are local .hgn bundles discovered from disk, so the recipe is
-// dynamic_models: ModelManager asks HalowinOps::discover_models() instead of
-// server_models.json.
+// Wraps gfx1151-engine (qwenox engine + qwenox API), a gfx1151-specific MoE
+// inference engine. Models are local .hgn bundles discovered from disk, so the
+// recipe is dynamic_models: ModelManager asks HalowinOps::discover_models()
+// instead of server_models.json.
 inline const BackendDescriptor descriptor = {
     /*recipe*/          "halowin",
     /*display_name*/    "HaloWin (gfx1151)",
@@ -29,15 +29,20 @@ inline const BackendDescriptor descriptor = {
     /*dynamic_models*/  true,  // models come from scanning halowin_models_dir
     /*options*/ {
         {"halowin_args", "--halowin-args", "", "ARGS",
-         "Extra arguments passed to the gdec-api OpenAI front-end", "HaloWin Options"},
+         "Extra arguments passed to the qwenox API (OpenAI front-end)", "HaloWin Options"},
         {"halowin_engine_args", "--halowin-engine-args", "", "ARGS",
-         "Extra arguments passed to the gdec engine", "HaloWin Options"},
+         "Extra arguments passed to the qwenox engine", "HaloWin Options"},
         {"halowin_bin_dir", "--halowin-bin-dir", "", "STRING",
-         "Directory containing gdec and gdec-api; overrides the installed engine", "HaloWin Options"},
+         "Directory containing qwenox-engine-win.exe / qwenox-win.exe; overrides the installed engine",
+         "HaloWin Options"},
         {"halowin_models_dir", "--halowin-models-dir", "", "STRING",
          "Directory scanned for .hgn model sets", "HaloWin Options"},
         {"halowin_prefill_chunk", "--halowin-prefill-chunk", "", "STRING",
-         "Prefill chunk in tokens (GDEC_PREFILL_CHUNK); Windows 4096 saves ~3.5 GiB VRAM",
+         "Prefill chunk in tokens (QWENOX_PREFILL_CHUNK); Windows 4096 saves ~3.5 GiB VRAM",
+         "HaloWin Options"},
+        {"halowin_mtp_gamma", "--halowin-mtp-gamma", "", "STRING",
+         "MTP speculative draft length 1-8 (QWENOX_SPEC_GAMMA); empty = upstream auto "
+         "(greedy 4, sampling adaptive 3-7)",
          "HaloWin Options"},
     },
     /*support*/ {
@@ -58,7 +63,7 @@ inline const BackendDescriptor descriptor = {
     /*bin_variants*/    {"win"},
     /*config_extra*/    {{"halowin_models_dir", ""}, {"halowin_bin_dir", ""},
                          {"halowin_args", ""}, {"halowin_engine_args", ""},
-                         {"halowin_prefill_chunk", ""}},
+                         {"halowin_prefill_chunk", ""}, {"halowin_mtp_gamma", ""}},
 };
 
 }  // namespace halowin

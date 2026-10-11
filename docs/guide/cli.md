@@ -480,11 +480,12 @@ The following options are available depending on the recipe being used:
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--ctx-size SIZE` | Context size for the model | auto |
-| `--halowin-args ARGS` | Extra arguments passed to the gdec-api OpenAI front-end | `""` |
-| `--halowin-engine-args ARGS` | Extra arguments passed to the gdec engine | `""` |
-| `--halowin-bin-dir STRING` | Directory containing gdec and gdec-api; overrides the installed engine | `""` |
+| `--halowin-args ARGS` | Extra arguments passed to the qwenox API (OpenAI front-end) | `""` |
+| `--halowin-engine-args ARGS` | Extra arguments passed to the qwenox engine | `""` |
+| `--halowin-bin-dir STRING` | Directory containing qwenox-engine-win.exe / qwenox-win.exe; overrides the installed engine | `""` |
 | `--halowin-models-dir STRING` | Directory scanned for .hgn model sets | `""` |
-| `--halowin-prefill-chunk STRING` | Prefill chunk in tokens (GDEC_PREFILL_CHUNK); Windows 4096 saves ~3.5 GiB VRAM | `""` |
+| `--halowin-prefill-chunk STRING` | Prefill chunk in tokens (QWENOX_PREFILL_CHUNK); Windows 4096 saves ~3.5 GiB VRAM | `""` |
+| `--halowin-mtp-gamma STRING` | MTP speculative draft length 1-8 (QWENOX_SPEC_GAMMA); empty = upstream auto (greedy 4, sampling adaptive 3-7) | `""` |
 <!-- END GENERATED: cli-recipe-options -->
 **Notes:**
 - Unspecified options will use the backend's default values

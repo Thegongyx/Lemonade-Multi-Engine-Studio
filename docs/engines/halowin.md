@@ -78,6 +78,7 @@ curl -X POST http://localhost:13305/v1/chat/completions -H "Content-Type: applic
 | `halowin_args` | `""` | 追加给 `qwenox-win`（API 前端）的参数 |
 | `halowin_engine_args` | `""` | 追加给 `qwenox-engine` 的参数 |
 | `halowin_prefill_chunk` | `""` | prefill 分段（token），透传为引擎环境变量 `QWENOX_PREFILL_CHUNK`；Windows 设 `4096` 可省约 3.5 GiB 显存（PP 约慢 2%），留空则用引擎默认 8192 |
+| `halowin_mtp_gamma` | `""` | MTP 投机草拟长度 1–8，透传为 `QWENOX_SPEC_GAMMA`；**留空 = 上游默认（auto）**：greedy 用 4、采样自适应 3–7 |
 | `win_bin` | `"builtin"` | 标准二进制覆盖钩子（`LEMONADE_HALOWIN_WIN_BIN`） |
 
 ## 已知限制

@@ -37,6 +37,7 @@ export default function ModelConfigModal({
   const [builder, setBuilder] = useState<BuilderParam[]>([]);
   const [ctxSize, setCtxSize] = useState("");
   const [prefillChunk, setPrefillChunk] = useState("");
+  const [mtpGamma, setMtpGamma] = useState("");
   const [showParams, setShowParams] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -75,6 +76,7 @@ export default function ModelConfigModal({
         const cs = Number(eff.ctx_size);
         setCtxSize(Number.isFinite(cs) && cs > 0 ? String(cs) : "");
         setPrefillChunk(String(eff.halowin_prefill_chunk ?? ""));
+        setMtpGamma(String(eff.halowin_mtp_gamma ?? ""));
       })
       .catch(() => {});
   }, [modelId, argsKey, effectiveRecipe, isLlama, engines]);
@@ -111,8 +113,10 @@ export default function ModelConfigModal({
       // Only send ctx_size when set, so an empty field keeps the global default.
       if (ctxSize.trim() !== "") payload.ctx_size = Number(ctxSize);
       if (effectiveRecipe === "halowin") {
-        // Blank means "no GDEC_PREFILL_CHUNK" → engine default (Windows 8192).
+        // Blank means "no QWENOX_PREFILL_CHUNK" → engine default (Windows 8192).
         payload.halowin_prefill_chunk = prefillChunk.trim();
+        // Blank gamma = upstream auto (greedy 4, sampling adaptive).
+        payload.halowin_mtp_gamma = mtpGamma.trim();
       }
       await api.saveModelOptions(modelId, payload);
       setToast(t("models.saved"));
@@ -282,6 +286,21 @@ export default function ModelConfigModal({
                 placeholder="4096"
               />
               <div className="hint">{t("models.prefillChunkHint")}</div>
+            </label>
+          )}
+
+          {effectiveRecipe === "halowin" && (
+            <label className="field">
+              <span>{t("models.mtpGamma")}</span>
+              <select value={mtpGamma} onChange={(e) => setMtpGamma(e.target.value)}>
+                <option value="">{t("models.mtpGammaAuto")}</option>
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                  <option key={n} value={String(n)}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+              <div className="hint">{t("models.mtpGammaHint")}</div>
             </label>
           )}
 

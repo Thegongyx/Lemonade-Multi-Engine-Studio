@@ -459,13 +459,18 @@ void HalowinServer::load(const std::string& model_name,
         {"QWENOX_INDEX_STREAM_SELECT", "1"}, {"QWENOX_KVSNAP", "1"},
         {"QWENOX_KVSNAP_MAX_GB", "20"}, {"QWENOX_RCKPT_MAX", "8"},
         {"QWENOX_KV_PAGED", "1"}, {"QWENOX_PARALLEL", "1"},
-        {"QWENOX_SPEC_GAMMA", "3"},
     };
     // Prefill chunk: an empty option keeps the engine default (Windows 8192);
     // 4096 shrinks the prefill workspace by ~3.5 GiB at a small PP cost.
     const std::string prefill_chunk = option_string(options, "halowin_prefill_chunk");
     if (!prefill_chunk.empty()) {
         env.push_back({"QWENOX_PREFILL_CHUNK", prefill_chunk});
+    }
+    // MTP draft length: empty keeps the upstream default (auto: greedy 4,
+    // sampling adapts 3-7). Setting 1-8 forces a fixed gamma for every request.
+    const std::string mtp_gamma = option_string(options, "halowin_mtp_gamma");
+    if (!mtp_gamma.empty()) {
+        env.push_back({"QWENOX_SPEC_GAMMA", mtp_gamma});
     }
 
     // Positional checkpoint order mirrors start_hgn.sh: main, overlay (v1 only),
