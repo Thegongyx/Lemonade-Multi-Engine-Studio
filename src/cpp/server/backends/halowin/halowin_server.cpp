@@ -44,11 +44,11 @@ namespace backends {
 namespace {
 
 #ifdef _WIN32
-constexpr const char* kEngineExe = "gdec-win.exe";
-constexpr const char* kApiExe = "gdec-api-win.exe";
+constexpr const char* kEngineExe = "qwenox-engine-win.exe";
+constexpr const char* kApiExe = "qwenox-win.exe";
 #else
-constexpr const char* kEngineExe = "gdec";
-constexpr const char* kApiExe = "gdec-api";
+constexpr const char* kEngineExe = "qwenox-engine";
+constexpr const char* kApiExe = "qwenox-win";
 #endif
 
 std::string lower_ascii(std::string value) {
@@ -98,7 +98,7 @@ std::string option_string(const RecipeOptions& options, const std::string& key) 
 
 // The v0.0.5 engine only opens its line-protocol port once the weights are
 // resident, so a TCP connect to the engine port is the readiness signal.
-// (`/cache` on gdec-api proxies the engine CSTAT verb, which v0.0.5 no longer
+// (`/cache` on qwenox API proxies the engine CSTAT verb, which v0.0.5 no longer
 // answers, so it cannot be used as the gate.)
 bool engine_port_open(const std::string& host, int port, int timeout_ms) {
 #ifdef _WIN32
@@ -329,9 +329,9 @@ bool HalowinServer::is_backend_alive() const {
 }
 
 bool HalowinServer::wait_for_halowin_ready(long timeout_seconds) {
-    // /health answers as soon as gdec-api is up. The v0.0.5 engine opens its
+    // /health answers as soon as qwenox API is up. The v0.0.5 engine opens its
     // line-protocol port (engine_port_) only after the weights are resident, so
-    // a TCP connect there is the "model loaded" signal; gdec-api /cache cannot
+    // a TCP connect there is the "model loaded" signal; qwenox API /cache cannot
     // be used because it proxies the engine CSTAT verb, which v0.0.5 dropped.
     const std::string health_url = get_base_url() + "/health";
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(timeout_seconds);
@@ -348,14 +348,14 @@ bool HalowinServer::wait_for_halowin_ready(long timeout_seconds) {
 
         const ProcessHandle api_handle = get_process_handle_snapshot();
         if (!has_process_handle(api_handle) || !utils::ProcessManager::is_running(api_handle)) {
-            LOG(ERROR, "HaloWin") << "gdec-api exited during startup" << std::endl;
+            LOG(ERROR, "HaloWin") << "qwenox API exited during startup" << std::endl;
             return false;
         }
         {
             std::lock_guard<std::mutex> lock(engine_mutex_);
             if (!has_process_handle(engine_handle_) ||
                 !utils::ProcessManager::is_running(engine_handle_)) {
-                LOG(ERROR, "HaloWin") << "gdec engine exited during startup" << std::endl;
+                LOG(ERROR, "HaloWin") << "qwenox engine exited during startup" << std::endl;
                 return false;
             }
         }
@@ -431,11 +431,11 @@ void HalowinServer::load(const std::string& model_name,
     }
     if (api_path.empty()) {
         throw std::runtime_error(
-            "HaloWin gdec-api not found. Install the halowin engine or set halowin_bin_dir.");
+            "HaloWin qwenox API not found. Install the halowin engine or set halowin_bin_dir.");
     }
     if (engine_path.empty()) {
         throw std::runtime_error(
-            "HaloWin gdec not found. Install the halowin engine or set halowin_bin_dir.");
+            "HaloWin qwenox engine not found. Install the halowin engine or set halowin_bin_dir.");
     }
 
     port_ = choose_port();
@@ -451,21 +451,21 @@ void HalowinServer::load(const std::string& model_name,
         utils::path_to_utf8(utils::path_from_utf8(api_path).parent_path());
 
     std::vector<std::pair<std::string, std::string>> env = {
-        {"GDEC_QSA_KV_BF16", "1"}, {"GDEC_QSA_WMMA", "1"}, {"GDEC_QSA_WMMA_BTV", "1"},
-        {"GDEC_MOE_LT", "1"}, {"GDEC_MOE_LT_BF16", "1"}, {"GDEC_GR_BF16", "1"},
-        {"GDEC_GDN_STREAM", "1"}, {"GDEC_GDN_WAVE", "1"}, {"GDEC_NOWARMUP", "1"},
-        {"GDEC_GEMM_WMMA", "1"}, {"GDEC_GDN_FUSED", "1"},
-        {"GDEC_INDEX_FUSED2", "1"}, {"GDEC_PP_MOE_OUT", "1"},
-        {"GDEC_INDEX_STREAM_SELECT", "1"}, {"GDEC_KVSNAP", "1"},
-        {"GDEC_KVSNAP_MAX_GB", "20"}, {"GDEC_RCKPT_MAX", "8"},
-        {"GDEC_KV_PAGED", "1"}, {"GDEC_PARALLEL", "1"},
-        {"GDEC_SPEC_GAMMA", "3"},
+        {"QWENOX_QSA_KV_BF16", "1"}, {"QWENOX_QSA_WMMA", "1"}, {"QWENOX_QSA_WMMA_BTV", "1"},
+        {"QWENOX_MOE_LT", "1"}, {"QWENOX_MOE_LT_BF16", "1"}, {"QWENOX_GR_BF16", "1"},
+        {"QWENOX_GDN_STREAM", "1"}, {"QWENOX_GDN_WAVE", "1"}, {"QWENOX_NOWARMUP", "1"},
+        {"QWENOX_GEMM_WMMA", "1"}, {"QWENOX_GDN_FUSED", "1"},
+        {"QWENOX_INDEX_FUSED2", "1"}, {"QWENOX_PP_MOE_OUT", "1"},
+        {"QWENOX_INDEX_STREAM_SELECT", "1"}, {"QWENOX_KVSNAP", "1"},
+        {"QWENOX_KVSNAP_MAX_GB", "20"}, {"QWENOX_RCKPT_MAX", "8"},
+        {"QWENOX_KV_PAGED", "1"}, {"QWENOX_PARALLEL", "1"},
+        {"QWENOX_SPEC_GAMMA", "3"},
     };
     // Prefill chunk: an empty option keeps the engine default (Windows 8192);
     // 4096 shrinks the prefill workspace by ~3.5 GiB at a small PP cost.
     const std::string prefill_chunk = option_string(options, "halowin_prefill_chunk");
     if (!prefill_chunk.empty()) {
-        env.push_back({"GDEC_PREFILL_CHUNK", prefill_chunk});
+        env.push_back({"QWENOX_PREFILL_CHUNK", prefill_chunk});
     }
 
     // Positional checkpoint order mirrors start_hgn.sh: main, overlay (v1 only),
@@ -490,13 +490,14 @@ void HalowinServer::load(const std::string& model_name,
         engine_args.push_back(arg);
     }
 
-    // Match the other backends: capture child output through a pipe (filtered,
-    // CREATE_NO_WINDOW) at info level. Passing filter_health_logs=false makes
-    // the spawn use direct handle inheritance, which gives the console-subsystem
-    // gdec a fresh console window when the parent has none.
-    const bool inherit_child_output = (log_level_ == "info") || is_debug();
+    // Always capture child output through a pipe. The engine is a
+    // console-subsystem exe (pipe + CREATE_NO_WINDOW keeps it windowless), and
+    // the v0.0.7 qwenox API is a GUI app: it only calls console_open() when its
+    // stdout is neither a pipe nor a file, and it only enters tray/single-
+    // instance mode without --console. Piping keeps it headless.
+    const bool inherit_child_output = true;
 
-    LOG(INFO, "HaloWin") << "Starting gdec: " << engine_path << std::endl;
+    LOG(INFO, "HaloWin") << "Starting qwenox-engine: " << engine_path << std::endl;
     {
         std::lock_guard<std::mutex> lock(engine_mutex_);
         engine_handle_ = utils::ProcessManager::start_process(
@@ -504,7 +505,7 @@ void HalowinServer::load(const std::string& model_name,
         if (!has_process_handle(engine_handle_) ||
             !utils::ProcessManager::is_running(engine_handle_)) {
             engine_handle_ = {nullptr, 0};
-            throw std::runtime_error("Failed to start the HaloWin gdec engine");
+            throw std::runtime_error("Failed to start the HaloWin qwenox engine");
         }
     }
 
@@ -514,12 +515,15 @@ void HalowinServer::load(const std::string& model_name,
         "--host", "127.0.0.1",
         "--port", std::to_string(port_),
         "--context", std::to_string(ctx_size),
+        // GUI build: --console keeps it out of tray/single-instance mode; with a
+        // piped stdout it does not allocate a console window either.
+        "--console",
     };
     for (const auto& arg : split_args(option_string(options, "halowin_args"))) {
         api_args.push_back(arg);
     }
 
-    LOG(INFO, "HaloWin") << "Starting gdec-api: " << api_path << std::endl;
+    LOG(INFO, "HaloWin") << "Starting qwenox API: " << api_path << std::endl;
     const ProcessHandle api_handle = utils::ProcessManager::start_process(
         api_path, api_args, workdir, inherit_child_output, true, env);
     set_process_handle(api_handle, api_path, api_args);
@@ -527,7 +531,7 @@ void HalowinServer::load(const std::string& model_name,
         const ProcessHandle dead = consume_process_handle_for_cleanup();
         if (has_process_handle(dead)) utils::ProcessManager::stop_process(dead);
         stop_engine();
-        throw std::runtime_error("Failed to start the HaloWin gdec-api front-end");
+        throw std::runtime_error("Failed to start the HaloWin qwenox API front-end");
     }
 
     if (!wait_for_halowin_ready(1800)) {

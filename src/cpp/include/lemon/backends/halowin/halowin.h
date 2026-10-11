@@ -17,9 +17,9 @@ inline const BackendDescriptor descriptor = {
     /*recipe*/          "halowin",
     /*display_name*/    "HaloWin (gfx1151)",
 #ifdef _WIN32
-    /*binary*/          "gdec-api-win.exe",
+    /*binary*/          "qwenox-win.exe",
 #else
-    /*binary*/          "gdec-api",
+    /*binary*/          "qwenox-win",
 #endif
     /*config_section*/  "halowin",
     /*default_device*/  DEVICE_GPU,

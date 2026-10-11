@@ -5,10 +5,10 @@
 一个面向 **AMD Strix Halo（gfx1151）** 的大 MoE 本地推理引擎。
 目标模型是 **Qwen3.8-Flash-Next（qwen4exp 架构）** 及同结构微调。
 
-引擎本体是两个进程：
+引擎本体是两个进程（**v0.0.7 起上游把 `gdec` 改名为 `qwenox`**）：
 
-- `gdec-win.exe` —— 引擎，权重按 4-bit 存放于内存、GPU kernel 直读；
-- `gdec-api-win.exe` —— OpenAI 兼容 HTTP 前端，Lemonade 只与它通信。
+- `qwenox-engine-win.exe` —— 引擎，权重按 4-bit 存放于内存、GPU kernel 直读；
+- `qwenox-win.exe` —— OpenAI 兼容 HTTP 前端（GUI 程序；Lemonade 以 `--console` + 管道输出无窗口运行），Lemonade 只与它通信。
 
 Lemonade 负责拉起两者、探活、按模型路由与清理。
 
@@ -28,12 +28,12 @@ Lemonade 负责拉起两者、探活、按模型路由与清理。
 lemonade backends install halowin:win
 ```
 
-默认从 GitHub Release `v0.0.6` 下载 `releases-windows.zip`（约 70 MB），解压到
+默认从 GitHub Release `v0.0.7-fix-2` 下载 `releases-windows.zip`（约 70 MB），解压到
 `<cache>\bin\halowin\win\`。自编译引擎可改为在 `config.json` 里指定目录：
 
 ```jsonc
 "halowin": {
-  "halowin_bin_dir": "…\\gfx1151-engine\\build"   // 含 gdec-win.exe / gdec-api-win.exe
+  "halowin_bin_dir": "…\\gfx1151-engine\\build"   // 含 qwenox-engine-win.exe / qwenox-win.exe
 }
 ```
 
@@ -55,7 +55,7 @@ HaloWin 的模型是一组 **`.hgn` 文件 + `tokenizer/`**，不是 GGUF。默�
 文件名按后缀自动归位（`*ngram*` / `*vision*` / `*overlay*` / `*mtp*`，其余视为 main），
 目录名即模型名（后缀 `-HaloWin`）。服务启动时会自动发现，出现在 `/v1/models` 与 WebUI 模型列表里。
 **hgn v2** 把 PLE n-gram 表拆成独立文件，引擎按张量类型自动识别 v1/v2；后端会把
-`main → overlay → ngram → mtp` 按启动器顺序作为位置参数传给 `gdec`。权重用引擎自带的
+`main → overlay → ngram → mtp` 按启动器顺序作为位置参数传给 `qwenox-engine`。权重用引擎自带的
 `tools/flashnext2hgn.py` 从 HF safetensors 转换。
 
 > **模型参数设置里的引擎**：`/api/v1/engines` 现在会列出**所有已安装引擎/后端**（含
@@ -75,9 +75,9 @@ curl -X POST http://localhost:13305/v1/chat/completions -H "Content-Type: applic
 |---|---|---|
 | `halowin_bin_dir` | `""` | 引擎可执行文件所在目录（自编译时用） |
 | `halowin_models_dir` | `""`（= `<models_dir>\halowin`） | 扫描 `.hgn` 模型的目录 |
-| `halowin_args` | `""` | 追加给 `gdec-api` 的参数 |
-| `halowin_engine_args` | `""` | 追加给 `gdec` 的参数 |
-| `halowin_prefill_chunk` | `""` | prefill 分段（token），透传为引擎环境变量 `GDEC_PREFILL_CHUNK`；Windows 设 `4096` 可省约 3.5 GiB 显存（PP 约慢 2%），留空则用引擎默认 8192 |
+| `halowin_args` | `""` | 追加给 `qwenox-win`（API 前端）的参数 |
+| `halowin_engine_args` | `""` | 追加给 `qwenox-engine` 的参数 |
+| `halowin_prefill_chunk` | `""` | prefill 分段（token），透传为引擎环境变量 `QWENOX_PREFILL_CHUNK`；Windows 设 `4096` 可省约 3.5 GiB 显存（PP 约慢 2%），留空则用引擎默认 8192 |
 | `win_bin` | `"builtin"` | 标准二进制覆盖钩子（`LEMONADE_HALOWIN_WIN_BIN`） |
 
 ## 已知限制
