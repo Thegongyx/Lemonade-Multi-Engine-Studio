@@ -38,6 +38,7 @@ export default function ModelConfigModal({
   const [ctxSize, setCtxSize] = useState("");
   const [prefillChunk, setPrefillChunk] = useState("");
   const [mtpGamma, setMtpGamma] = useState("");
+  const [parallel, setParallel] = useState("1");
   const [showParams, setShowParams] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -77,6 +78,7 @@ export default function ModelConfigModal({
         setCtxSize(Number.isFinite(cs) && cs > 0 ? String(cs) : "");
         setPrefillChunk(String(eff.halowin_prefill_chunk ?? ""));
         setMtpGamma(String(eff.halowin_mtp_gamma ?? ""));
+        setParallel(String(eff.halowin_parallel || "1"));
       })
       .catch(() => {});
   }, [modelId, argsKey, effectiveRecipe, isLlama, engines]);
@@ -117,6 +119,8 @@ export default function ModelConfigModal({
         payload.halowin_prefill_chunk = prefillChunk.trim();
         // Blank gamma = upstream auto (greedy 4, sampling adaptive).
         payload.halowin_mtp_gamma = mtpGamma.trim();
+        // Concurrent serve slots (1-8).
+        payload.halowin_parallel = parallel;
       }
       await api.saveModelOptions(modelId, payload);
       setToast(t("models.saved"));
@@ -301,6 +305,20 @@ export default function ModelConfigModal({
                 ))}
               </select>
               <div className="hint">{t("models.mtpGammaHint")}</div>
+            </label>
+          )}
+
+          {effectiveRecipe === "halowin" && (
+            <label className="field">
+              <span>{t("models.parallel")}</span>
+              <select value={parallel} onChange={(e) => setParallel(e.target.value)}>
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                  <option key={n} value={String(n)}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+              <div className="hint">{t("models.parallelHint")}</div>
             </label>
           )}
 

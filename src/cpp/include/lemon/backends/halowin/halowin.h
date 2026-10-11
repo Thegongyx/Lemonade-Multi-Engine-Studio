@@ -44,6 +44,10 @@ inline const BackendDescriptor descriptor = {
          "MTP speculative draft length 1-8 (QWENOX_SPEC_GAMMA); empty = upstream auto "
          "(greedy 4, sampling adaptive 3-7)",
          "HaloWin Options"},
+        {"halowin_parallel", "--halowin-parallel", "", "STRING",
+         "Concurrent serve slots 1-8 (QWENOX_PARALLEL); slots share the paged KV pool, "
+         "each extra slot costs ~0.12 GiB VRAM",
+         "HaloWin Options"},
     },
     /*support*/ {
         {"win", {"windows"}, {{"amd_gpu", {"gfx1151"}}}, "AMD Radeon 8060S / Strix Halo (gfx1151)"},
@@ -63,7 +67,8 @@ inline const BackendDescriptor descriptor = {
     /*bin_variants*/    {"win"},
     /*config_extra*/    {{"halowin_models_dir", ""}, {"halowin_bin_dir", ""},
                          {"halowin_args", ""}, {"halowin_engine_args", ""},
-                         {"halowin_prefill_chunk", ""}, {"halowin_mtp_gamma", ""}},
+                         {"halowin_prefill_chunk", ""}, {"halowin_mtp_gamma", ""},
+                         {"halowin_parallel", ""}},
 };
 
 }  // namespace halowin

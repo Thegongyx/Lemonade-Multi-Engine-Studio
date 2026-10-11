@@ -458,7 +458,7 @@ void HalowinServer::load(const std::string& model_name,
         {"QWENOX_INDEX_FUSED2", "1"}, {"QWENOX_PP_MOE_OUT", "1"},
         {"QWENOX_INDEX_STREAM_SELECT", "1"}, {"QWENOX_KVSNAP", "1"},
         {"QWENOX_KVSNAP_MAX_GB", "20"}, {"QWENOX_RCKPT_MAX", "8"},
-        {"QWENOX_KV_PAGED", "1"}, {"QWENOX_PARALLEL", "1"},
+        {"QWENOX_KV_PAGED", "1"},
     };
     // Prefill chunk: an empty option keeps the engine default (Windows 8192);
     // 4096 shrinks the prefill workspace by ~3.5 GiB at a small PP cost.
@@ -472,6 +472,10 @@ void HalowinServer::load(const std::string& model_name,
     if (!mtp_gamma.empty()) {
         env.push_back({"QWENOX_SPEC_GAMMA", mtp_gamma});
     }
+    // Concurrent serve slots: default 1; 2-8 share the paged KV pool (each extra
+    // slot costs ~0.12 GiB). KV paging is always enabled above, as required.
+    const std::string parallel = option_string(options, "halowin_parallel");
+    env.push_back({"QWENOX_PARALLEL", parallel.empty() ? "1" : parallel});
 
     // Positional checkpoint order mirrors start_hgn.sh: main, overlay (v1 only),
     // the split n-gram table (v2 only; skipped when it is the main file), MTP.

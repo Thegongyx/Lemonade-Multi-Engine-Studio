@@ -34,6 +34,7 @@
     "halowin_engine_args": "",
     "halowin_models_dir": "",
     "halowin_mtp_gamma": "",
+    "halowin_parallel": "",
     "halowin_prefill_chunk": "",
     "win_bin": "builtin"
   },

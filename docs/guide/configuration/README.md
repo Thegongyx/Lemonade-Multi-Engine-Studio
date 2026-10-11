@@ -73,6 +73,7 @@ When `lemond` starts, effective configuration is resolved by deep-merging settin
     "halowin_models_dir": "",
     "halowin_prefill_chunk": "",
     "halowin_mtp_gamma": "",
+    "halowin_parallel": "",
     "win_bin": "builtin"
   },
   "host": "localhost",

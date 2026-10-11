@@ -486,6 +486,7 @@ The following options are available depending on the recipe being used:
 | `--halowin-models-dir STRING` | Directory scanned for .hgn model sets | `""` |
 | `--halowin-prefill-chunk STRING` | Prefill chunk in tokens (QWENOX_PREFILL_CHUNK); Windows 4096 saves ~3.5 GiB VRAM | `""` |
 | `--halowin-mtp-gamma STRING` | MTP speculative draft length 1-8 (QWENOX_SPEC_GAMMA); empty = upstream auto (greedy 4, sampling adaptive 3-7) | `""` |
+| `--halowin-parallel STRING` | Concurrent serve slots 1-8 (QWENOX_PARALLEL); slots share the paged KV pool, each extra slot costs ~0.12 GiB VRAM | `""` |
 <!-- END GENERATED: cli-recipe-options -->
 **Notes:**
 - Unspecified options will use the backend's default values
