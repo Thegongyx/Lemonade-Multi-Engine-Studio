@@ -1551,6 +1551,71 @@
         ],
         "size": 18.8
     },
+    "Qwen3.8-Flash-Next-Gufo": {
+        "checkpoints": {
+            "main": "unsloth/Qwen3.8-Flash-Next-GGUF:UD-Q4_K_XL",
+            "draft": "unsloth/Qwen3.8-Flash-Next-GGUF:MTP/mtp-Qwen3.8-Flash-Next-shared-Q8_0.gguf",
+            "mmproj": "unsloth/Qwen3.8-Flash-Next-GGUF:mmproj-BF16.gguf"
+        },
+        "recipe": "llamacpp",
+        "suggested": true,
+        "labels": [
+            "chat",
+            "reasoning",
+            "vision",
+            "tool-calling",
+            "mtp"
+        ],
+        "size": 107.2,
+        "recipe_options": {
+            "ctx_size": 32768,
+            "llamacpp_engine": "gufo",
+            "gufo_sessions": "2"
+        }
+    },
+    "Qwen3.8-27B-Gufo": {
+        "checkpoints": {
+            "main": "unsloth/Qwen3.8-27B-GGUF:Qwen3.8-27B-UD-Q4_K_XL.gguf",
+            "draft": "z-lab/Qwen3.8-27B-DFlash2-GGUF:Qwen3.8-27B-DFlash2-Q4_K_M.gguf",
+            "mmproj": "unsloth/Qwen3.8-27B-GGUF:mmproj-BF16.gguf"
+        },
+        "recipe": "llamacpp",
+        "suggested": true,
+        "labels": [
+            "chat",
+            "reasoning",
+            "vision",
+            "tool-calling",
+            "dflash"
+        ],
+        "size": 18.3,
+        "recipe_options": {
+            "ctx_size": 32768,
+            "llamacpp_engine": "gufo",
+            "gufo_sessions": "2"
+        }
+    },
+    "Qwen3.6-35B-A3B-Gufo": {
+        "checkpoints": {
+            "main": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:Qwen3.6-35B-A3B-UD-Q8_K_XL.gguf"
+        },
+        "recipe": "llamacpp",
+        "suggested": true,
+        "labels": [
+            "chat",
+            "reasoning",
+            "tool-calling",
+            "mtp"
+        ],
+        "size": 36.4,
+        "recipe_options": {
+            "ctx_size": 131072,
+            "llamacpp_engine": "gufo",
+            "gufo_think": "on",
+            "gufo_sessions": "1",
+            "gufo_args": "--temperature 1.0 --top-p 0.95 --top-k 20 --draft-tokens 6"
+        }
+    },
     "Llama-4-Scout-17B-16E-Instruct-GGUF": {
         "checkpoint": "unsloth/Llama-4-Scout-17B-16E-Instruct-GGUF:Q4_K_S",
         "mmproj": "mmproj-F16.gguf",

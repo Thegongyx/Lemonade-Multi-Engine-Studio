@@ -20,6 +20,7 @@ Lemonade exists to make the world of local AI simple and enjoyable for users and
 - [Build guides](./engines/build/) — HIP / Vulkan / ciru-rocmfpx / strixllama
 - [Benchmark methodology](./engines/benchmark-methodology.md)
 - [HaloWin backend](./engines/halowin.md)
+- [Gufo backend](./engines/gufo.md)
 - [NovaMax engine skill](./engines/novamax-llamacpp-skill/SKILL.md)
 
 ### User Guide

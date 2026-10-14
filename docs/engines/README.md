@@ -10,6 +10,8 @@
 | 文档 | 内容 |
 |---|---|
 | [halowin.md](halowin.md) | HaloWin（gfx1151）后端 |
+| [gufo.md](gufo.md) | Gufo（gfx1151）后端 |
+| [engine-switching.md](engine-switching.md) | 设计稿：一个模型自由选择引擎（跨 recipe 绑定） |
 | [benchmark-methodology.md](benchmark-methodology.md) | 基准方法：参数、冷/热启动、口径 |
 | [build/BUILD-ROCM-HIP-GENERIC.md](build/BUILD-ROCM-HIP-GENERIC.md) | Windows HIP/ROCm 通用编译（gfx1151） |
 | [build/BUILD-VULKAN-ROCMFPX-WINDOWS.md](build/BUILD-VULKAN-ROCMFPX-WINDOWS.md) | 官方 Vulkan 版（`vulkan_official` + `ROCmFPXVulkan0` 插件） |

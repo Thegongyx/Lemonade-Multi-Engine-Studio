@@ -70,6 +70,8 @@ nav:
       - strixllama: engines/build/BUILD-STRIXLLAMA-WINDOWS.md
     - Benchmark methodology: engines/benchmark-methodology.md
     - HaloWin: engines/halowin.md
+    - Gufo: engines/gufo.md
+    - Engine switching (design): engines/engine-switching.md
     - NovaMax skill: engines/novamax-llamacpp-skill/SKILL.md
   - User Guide:
     - Getting Started: guide/README.md
