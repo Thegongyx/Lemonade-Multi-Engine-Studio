@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -50,6 +51,20 @@ static bool has_alias(const ModelInfo& info, const std::string& alias) {
            info.input_aliases.end();
 }
 
+// True when any discovered model is named after, or resolves to, a path holding
+// `needle` — robust to the exact id the discovery derives.
+static bool any_model_with(const std::map<std::string, ModelInfo>& models,
+                           const std::string& needle) {
+    for (const auto& [id, info] : models) {
+        if (id.find(needle) != std::string::npos) return true;
+        for (const auto& [type, path] : info.resolved_paths) {
+            (void)type;
+            if (path.find(needle) != std::string::npos) return true;
+        }
+    }
+    return false;
+}
+
 static bool check_type(const std::map<std::string, ModelInfo>& models,
                        const char* name,
                        const std::string& id,
@@ -69,6 +84,48 @@ static bool check_type(const std::map<std::string, ModelInfo>& models,
                 expected_label.c_str(), has_label(*info, expected_label) ? "yes" : "no");
     if (!ok) ++g_failures;
     return ok;
+}
+
+// A Hugging Face repository cache holds the model at the repo directory (flat
+// downloads) or in snapshots/<revision>; deeper directories are variants and
+// sidecars. Discovery must not list those as models of their own, or the same
+// bytes appear twice and the second copy has no draft/mmproj.
+static void test_hf_cache_variant_folders_are_not_models() {
+    fs::path extra = make_temp_dir();
+    const fs::path hub = fs::path(lemon::utils::get_hf_cache_dir());
+
+    // The discovery always scans the Hugging Face cache, so the fixture has to
+    // live there. main() points the cache at a scratch dir; refuse to write into
+    // a real user cache if that ever stops holding.
+    const std::string hub_text = hub.string();
+    const std::string temp_text = fs::temp_directory_path().string();
+    if (hub.empty() || hub_text.find(temp_text) == std::string::npos) {
+        check("hf cache fixture is isolated before writing (cache dir under temp)", false);
+        fs::remove_all(extra);
+        return;
+    }
+
+    touch(hub / "models--org--flat-repo" / "Qwen3-Flat-Q4_K_M.gguf");
+    touch(hub / "models--org--flat-repo" / "UD-Q4_K_XL" /
+          "Qwen3-Flat-UD-Q4_K_XL-00001-of-00004.gguf");
+    touch(hub / "models--org--flat-repo" / "UD-Q4_K_XL" /
+          "Qwen3-Flat-UD-Q4_K_XL-00002-of-00004.gguf");
+
+    touch(hub / "models--org--snap-repo" / "snapshots" / "abc123" / "Qwen3-Snap-Q4_K_M.gguf");
+    touch(hub / "models--org--snap-repo" / "snapshots" / "abc123" / "UD-Q4_K_XL" /
+          "Qwen3-Snap-UD-Q4_K_XL-00001-of-00004.gguf");
+
+    ModelManager manager(extra.string());
+    auto models = manager.discover_extra_models_for_test();
+
+    check("flat repo directory is a model", any_model_with(models, "Qwen3-Flat"));
+    check("snapshot directory is a model", any_model_with(models, "Qwen3-Snap"));
+    check("variant folder inside a repo cache is not a model",
+          !any_model_with(models, "UD-Q4_K_XL"));
+
+    fs::remove_all(hub / "models--org--flat-repo");
+    fs::remove_all(hub / "models--org--snap-repo");
+    fs::remove_all(extra);
 }
 
 static std::map<std::string, std::string> discovery_signature(
@@ -445,6 +502,18 @@ int main() {
     fs::path cache_dir = make_temp_dir();
     lemon::utils::set_cache_dir(cache_dir.string());
 
+    // Extra-model discovery always scans the Hugging Face hub cache, so a
+    // populated user cache would make every count-based assertion below
+    // environment-dependent. Point HF_HUB_CACHE at a scratch dir for this run.
+    fs::path hub_cache = make_temp_dir();
+    const std::string previous_hub_cache =
+        lemon::utils::get_environment_variable_utf8("HF_HUB_CACHE");
+#ifdef _WIN32
+    _putenv_s("HF_HUB_CACHE", hub_cache.string().c_str());
+#else
+    setenv("HF_HUB_CACHE", hub_cache.string().c_str(), 1);
+#endif
+
     test_root_files();
     test_split_variant_folder();
     test_folder_model();
@@ -464,7 +533,18 @@ int main() {
     test_root_beats_category_for_short_id();
     test_non_normalized_search_path();
     test_discovery_is_independent_of_creation_order();
+    test_hf_cache_variant_folders_are_not_models();
 
+#ifdef _WIN32
+    _putenv_s("HF_HUB_CACHE", previous_hub_cache.c_str());
+#else
+    if (previous_hub_cache.empty()) {
+        unsetenv("HF_HUB_CACHE");
+    } else {
+        setenv("HF_HUB_CACHE", previous_hub_cache.c_str(), 1);
+    }
+#endif
+    fs::remove_all(hub_cache);
     fs::remove_all(cache_dir);
 
     if (g_failures == 0) {
@@ -474,3 +554,5 @@ int main() {
     }
     return g_failures == 0 ? 0 : 1;
 }
+
+

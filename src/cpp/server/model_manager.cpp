@@ -1322,6 +1322,37 @@ static bool is_draft_gguf_filename(const std::string& filename) {
            gguf_reader_detail::contains_ignore_case(filename, "dflash");
 }
 
+// True when `dir` sits inside a Hugging Face repository cache deeper than the
+// layer that represents the model itself: the repository directory (flat
+// downloads) or its snapshots/<revision> directory. Deeper directories hold
+// variants and sidecars of that model (UD-Q4_K_XL/, mmproj/, blobs/), and the
+// registry already resolves those files through repo checkpoints. Listing them
+// here would duplicate the same bytes as a second, sidecar-less model — and one
+// whose first shard may be a metadata-only file.
+static bool is_hf_cache_variant_dir(const fs::path& dir) {
+    std::vector<std::string> components;  // deepest first, relative to the repo dir
+    bool inside_repo_cache = false;
+    for (fs::path p = dir; !p.empty();) {
+        const std::string name = p.filename().string();
+        if (name.rfind("models--", 0) == 0) {
+            inside_repo_cache = true;
+            break;
+        }
+        // A filesystem root is its own parent: stop there instead of looping.
+        const fs::path parent = p.parent_path();
+        if (parent == p) break;
+        components.push_back(name);
+        if (components.size() > 8) break;  // cannot be deeper than the layouts above
+        p = parent;
+    }
+    if (!inside_repo_cache) return false;
+
+    if (components.empty()) return false;                        // the repo dir itself
+    if (components.size() == 1) return true;                     // e.g. <repo>/UD-Q4_K_XL
+    if (components.size() == 2) return components[1] != "snapshots";  // snapshots/<rev> is the model layer
+    return true;                                                 // e.g. snapshots/<rev>/UD-Q4_K_XL
+}
+
 void ModelManager::discover_extra_models_in_root(
     const fs::path& search_path,
     std::map<std::string, ModelInfo>& discovered) const {
@@ -1362,6 +1393,12 @@ void ModelManager::discover_extra_models_in_root(
             if (!gguf_reader_detail::ends_with_ignore_case(filename, ".gguf")) continue;
 
             fs::path parent_dir = entry.path().parent_path();
+
+            // Inside a Hugging Face repository cache only the model layer
+            // contributes models; variant and sidecar folders are resolved by the
+            // registry through repo checkpoints instead (see the helper).
+            if (is_hf_cache_variant_dir(parent_dir)) continue;
+
             const std::string deployment_label =
                 extra_model_deployment_label(entry.path(), search_path);
             const fs::path relative_parent = parent_dir.lexically_relative(search_path);
