@@ -131,6 +131,9 @@ the generator instead. Prose outside the markers is preserved. -->
 | `llamacpp_device` | `--llamacpp-device` | DEVICES | "" | Comma-separated list of accelerator devices to use (e.g. Vulkan0) |
 | `llamacpp_args` | `--llamacpp-args` | ARGS | "" | Custom arguments to pass to llama-server |
 | `llamacpp_env` | `--llamacpp-env` | STRING | "" | Environment variables for llama-server, KEY=VALUE separated by newlines or ';' |
+| `gufo_args` | `--gufo-args` | ARGS | "" | Gufo-driver engines: extra arguments for `gufo serve` |
+| `gufo_think` | `--gufo-think` | STRING | "" | Gufo-driver engines: reasoning default on/off/auto (--think) |
+| `gufo_sessions` | `--gufo-sessions` | STRING | "" | Gufo-driver engines: preallocated GPU request sessions 1-8 (--sessions) |
 
 #### `llamacpp-hrx` — HRX GPU (experimental)
 

@@ -1,4 +1,5 @@
 #include "lemon/backends/llamacpp/llamacpp_server.h"
+#include "lemon/backends/llamacpp/engine_driver.h"
 #include "lemon/backends/llamacpp/llamacpp.h"
 #include "lemon/backends/llamacpp/llamacpp_gguf.h"
 #include "lemon/backends/llamacpp/llamacpp_request.h"
@@ -49,6 +50,11 @@
 
 namespace fs = std::filesystem;
 using namespace lemon::utils;
+
+// Engine-driver helpers (engine_driver.h): the process-and-command-line layer
+// for engines that are not llama-server. The body of this file sits in
+// lemon::backends, so alias the nested namespace for readable call sites.
+namespace engine_driver = lemon::backends::llamacpp::engine_driver;
 
 namespace lemon {
 namespace backends {
@@ -188,17 +194,35 @@ static std::string strip_device_tokens(const std::string& args) {
     return result;
 }
 
-// A named, user-supplied llama.cpp build from config.json's
+// A named, user-supplied engine build from config.json's
 // llamacpp.custom_engines map. Lets models on the same backend type (e.g. two
-// ROCm builds) run different compiled binaries.
+// ROCm builds) run different compiled binaries — or, with driver="gufo", a
+// different engine entirely.
 struct CustomEngine {
     std::string name;
     std::string path;
     std::string backend;
     std::string device;
     std::vector<std::pair<std::string, std::string>> env;
+    // Which program the record points at and how to drive it (see engine_driver.h).
+    std::string driver = engine_driver::kLlamacpp;
+    // Optional capability hints: models this engine refuses to load. Empty means
+    // "do not check".
+    std::vector<std::string> architectures;
+    std::vector<std::string> tensor_types;
     bool valid = false;
 };
+
+static std::vector<std::string> json_string_array(const json& entry, const char* key) {
+    std::vector<std::string> values;
+    if (entry.contains(key) && entry[key].is_array()) {
+        for (const auto& item : entry[key]) {
+            if (item.is_string()) values.push_back(item.get<std::string>());
+        }
+    }
+    return values;
+}
+
 
 // Canonical backend + default device for a backend downloaded through the WebUI,
 // whose directory name carries the channel ("rocm-stable", "vulkan-stable", "cpu").
@@ -245,6 +269,11 @@ static CustomEngine resolve_custom_engine(const std::string& name) {
                         }
                     }
                 }
+                if (entry.contains("driver") && entry["driver"].is_string()) {
+                    engine.driver = entry["driver"].get<std::string>();
+                }
+                engine.architectures = json_string_array(entry, "architectures");
+                engine.tensor_types = json_string_array(entry, "tensor_types");
                 engine.valid = !engine.path.empty();
                 if (engine.valid) return engine;
             }
@@ -339,6 +368,42 @@ static std::string get_therock_version() {
         throw std::runtime_error("backend_versions.json is missing 'therock.version'");
     }
     return trim_to_major_minor(config["therock"]["version"].get<std::string>());
+}
+
+// KEY=VALUE entries from the per-model env option (newline- or ';'-separated).
+static std::vector<std::pair<std::string, std::string>> parse_env_entries(const std::string& text) {
+    std::vector<std::pair<std::string, std::string>> entries;
+    std::string entry;
+    auto trim = [](std::string s) {
+        const size_t b = s.find_first_not_of(" \t\r\n");
+        const size_t e = s.find_last_not_of(" \t\r\n");
+        return (b == std::string::npos) ? std::string() : s.substr(b, e - b + 1);
+    };
+    auto flush = [&]() {
+        const size_t eq = entry.find('=');
+        if (eq != std::string::npos && eq > 0) {
+            std::string key = trim(entry.substr(0, eq));
+            std::string val = trim(entry.substr(eq + 1));
+            if (!key.empty()) entries.emplace_back(key, val);
+        }
+        entry.clear();
+    };
+    for (char c : text) {
+        if (c == '\n' || c == ';') flush();
+        else entry.push_back(c);
+    }
+    flush();
+    return entries;
+}
+
+static bool has_model_label(const ModelInfo& info, const char* label) {
+    return std::find(info.labels.begin(), info.labels.end(), label) != info.labels.end();
+}
+
+// DFlash2 and DSpark always need their sidecar; Flash-Next MTP may instead live
+// inside the trunk GGUF (Qwen3.6-35B-A3B), so only these two require a draft.
+static bool speculates_from_draft_checkpoint(const std::string& mode) {
+    return mode == "dflash2" || mode == "dspark";
 }
 
 InstallParams LlamaCppServer::get_install_params(const std::string& backend, const std::string& version) {
@@ -551,6 +616,98 @@ void LlamaCppServer::load(const std::string& model_name,
     std::string executable = custom_engine.valid
         ? custom_engine.path
         : BackendUtils::get_backend_binary_path(*llamacpp::spec(), llamacpp_backend);
+
+    // A named engine whose driver is not llama.cpp runs the same model files on a
+    // different program with its own command line (see engine_driver.h). The
+    // engine record, resolved paths, port and executable above are shared, so
+    // everything below this point is llama-server specific.
+    if (custom_engine.valid && custom_engine.driver != engine_driver::kLlamacpp) {
+        if (custom_engine.driver != engine_driver::kGufo) {
+            throw std::invalid_argument(
+                "Engine '" + llamacpp_engine + "' declares unknown driver '" +
+                custom_engine.driver + "' (expected '" + engine_driver::kLlamacpp + "' or '" +
+                engine_driver::kGufo + "')");
+        }
+        engine_driver::validate_model(llamacpp_engine, custom_engine.architectures,
+                                      custom_engine.tensor_types, gguf_path, model_name);
+
+        auto option_text = [&](const char* key) -> std::string {
+            if (!options.has_option(key)) return "";
+            const json value = options.get_option(key);
+            if (value.is_string()) return value.get<std::string>();
+            return value.is_null() ? std::string() : value.dump();
+        };
+
+        // gufo names its speculative mode explicitly; the model's labels carry it.
+        // A model whose MTP block lives inside the trunk GGUF (Qwen3.6-35B-A3B)
+        // has the label but no draft sidecar: gufo then drafts from the trunk.
+        std::string speculative_mode;
+        if (has_model_label(model_info, "dflash")) speculative_mode = "dflash2";
+        else if (has_model_label(model_info, "dspark")) speculative_mode = "dspark";
+        else if (has_model_label(model_info, "mtp")) speculative_mode = "mtp";
+        if (draft_path.empty() && speculative_mode.empty() == false &&
+            speculates_from_draft_checkpoint(speculative_mode)) {
+            LOG(WARNING, "LlamaCpp")
+                << "Model '" << model_name << "' is labeled '" << speculative_mode
+                << "' but has no draft checkpoint; serving autoregressively" << std::endl;
+            speculative_mode.clear();
+        } else if (!draft_path.empty() && speculative_mode.empty()) {
+            LOG(WARNING, "LlamaCpp")
+                << "Model '" << model_name << "' carries a draft checkpoint but no "
+                << "mtp/dflash/dspark label; serving autoregressively" << std::endl;
+        }
+
+        engine_driver::GufoLaunchSpec spec;
+        spec.model_path = gguf_path;
+        spec.served_model_name = model_name;
+        spec.mmproj_path = mmproj_path;
+        spec.draft_path = draft_path;
+        spec.speculative_mode = speculative_mode;
+        spec.ctx_size = ctx_size;
+        spec.sessions = option_text("gufo_sessions");
+        spec.think = option_text("gufo_think");
+        spec.extra_args = option_text("gufo_args");
+        spec.port = port_;
+
+        const std::vector<std::string> engine_args = engine_driver::build_gufo_args(spec);
+
+        // Engine env first, then the per-model box so a model can override it. The
+        // llama.cpp-specific runtime plumbing (TheRock staging, OCL_SET_SVM_SIZE,
+        // LD_LIBRARY_PATH) stays in the llama.cpp path below: this engine ships
+        // its own runtime beside the executable.
+        std::vector<std::pair<std::string, std::string>> engine_env = custom_engine.env;
+        for (auto& kv : parse_env_entries(llamacpp_env)) {
+            engine_env.push_back(kv);
+        }
+
+        std::string process_executable = executable;
+        std::string working_dir;
+        fs::path executable_path = fs::absolute(fs::path(executable));
+        process_executable = path_to_utf8(executable_path);
+        working_dir = path_to_utf8(executable_path.parent_path());
+
+        LOG(INFO, "LlamaCpp") << "Starting engine '" << llamacpp_engine << "' (driver: "
+                              << custom_engine.driver << ", " << process_executable << ") for "
+                              << gguf_path << " on port " << port_ << std::endl;
+
+        const bool inherit_engine_output = (log_level_ == "info") || is_debug();
+        set_process_handle(
+            ProcessManager::start_process(process_executable, engine_args, working_dir,
+                                          inherit_engine_output, true, engine_env),
+            process_executable, engine_args);
+
+        if (!wait_for_ready(engine_driver::readiness_endpoint(custom_engine.driver))) {
+            const ProcessHandle handle = consume_process_handle_for_cleanup();
+            if (has_process_handle(handle)) {
+                ProcessManager::stop_process(handle);
+            }
+            throw std::runtime_error("Engine '" + llamacpp_engine + "' failed to start");
+        }
+
+        engine_driver_ = custom_engine.driver;
+        LOG(DEBUG, "LlamaCpp") << "Model loaded on port " << get_backend_port() << std::endl;
+        return;
+    }
 
     bool supports_embeddings = (model_info.type == ModelType::EMBEDDING);
     bool supports_reranking = (model_info.type == ModelType::RERANKING);
@@ -815,32 +972,8 @@ void LlamaCppServer::load(const std::string& model_name,
 
     // Per-model environment variables from the llamacpp_env option (KEY=VALUE per line or
     // ';'-separated). Applied after the engine's env so a model can override the engine.
-    if (!llamacpp_env.empty()) {
-        std::string entry;
-        auto flush_entry = [&]() {
-            const size_t eq = entry.find('=');
-            if (eq != std::string::npos && eq > 0) {
-                auto trim = [](std::string s) {
-                    const size_t b = s.find_first_not_of(" \t\r\n");
-                    const size_t e = s.find_last_not_of(" \t\r\n");
-                    return (b == std::string::npos) ? std::string() : s.substr(b, e - b + 1);
-                };
-                std::string key = trim(entry.substr(0, eq));
-                std::string val = trim(entry.substr(eq + 1));
-                if (!key.empty()) {
-                    env_vars.push_back({key, val});
-                }
-            }
-            entry.clear();
-        };
-        for (char c : llamacpp_env) {
-            if (c == '\n' || c == ';') {
-                flush_entry();
-            } else {
-                entry.push_back(c);
-            }
-        }
-        flush_entry();
+    for (auto& kv : parse_env_entries(llamacpp_env)) {
+        env_vars.push_back(kv);
     }
 
     // Start process (inherit output if debug logging enabled, filter health check spam)
@@ -881,6 +1014,11 @@ void LlamaCppServer::unload() {
 }
 
 bool LlamaCppServer::downsize() {
+    if (engine_driver_ != engine_driver::kLlamacpp) {
+        // Erasing KV cache is a llama-server route (/slots); engines without it
+        // are treated as already downsized rather than failing maintenance.
+        return true;
+    }
     LOG(INFO, "LlamaCpp") << "Downsizing model by erasing KV cache..." << std::endl;
     try {
         json slots = get_slots();
@@ -908,27 +1046,42 @@ json LlamaCppServer::normalize_response_model(json response, const json& request
     return response;
 }
 
+json LlamaCppServer::with_engine_model_name(const json& request) const {
+    if (!engine_driver::rewrites_request_model(engine_driver_)) {
+        return request;
+    }
+    const std::string served = get_model_name();
+    if (served.empty() || request.value("model", std::string()) == served) {
+        return request;
+    }
+    json modified = request;
+    modified["model"] = served;
+    return modified;
+}
+
 json LlamaCppServer::chat_completion(const json& request) {
     return normalize_response_model(
         forward_request("/v1/chat/completions",
                         llamacpp::sanitize_tool_schema_limits(
-                            JsonUtils::with_legacy_max_tokens_alias(request))),
+                            JsonUtils::with_legacy_max_tokens_alias(
+                                with_engine_model_name(request)))),
         request);
 }
 
 json LlamaCppServer::completion(const json& request) {
     return normalize_response_model(
         forward_request("/v1/completions",
-                        JsonUtils::with_legacy_max_tokens_alias(request)),
+                        JsonUtils::with_legacy_max_tokens_alias(
+                            with_engine_model_name(request))),
         request);
 }
 
 json LlamaCppServer::embeddings(const json& request) {
-    return forward_request("/v1/embeddings", request);
+    return forward_request("/v1/embeddings", with_engine_model_name(request));
 }
 
 json LlamaCppServer::reranking(const json& request) {
-    return forward_request("/v1/rerank", request);
+    return forward_request("/v1/rerank", with_engine_model_name(request));
 }
 
 json LlamaCppServer::get_slots() {
@@ -962,6 +1115,10 @@ void LlamaCppServer::forward_streaming_request(const std::string& endpoint,
         if (!request.is_discarded()) {
             if (endpoint == "/v1/chat/completions") {
                 JsonUtils::add_legacy_max_tokens_alias(request);
+            }
+            if (engine_driver::rewrites_request_model(engine_driver_) &&
+                !get_model_name().empty()) {
+                request["model"] = get_model_name();
             }
             body = llamacpp::sanitize_tool_schema_limits(std::move(request)).dump();
         }

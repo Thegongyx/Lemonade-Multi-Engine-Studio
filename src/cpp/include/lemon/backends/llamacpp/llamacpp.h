@@ -33,6 +33,14 @@ inline const BackendDescriptor descriptor = {
          "Custom arguments to pass to llama-server", "Llama.cpp Backend Options"},
         {"llamacpp_env", "--llamacpp-env", "", "STRING",
          "Environment variables for llama-server, KEY=VALUE separated by newlines or ';'", "Llama.cpp Backend Options"},
+        // Consumed only when the selected engine's driver is not llama.cpp
+        // (config.json llamacpp.custom_engines "driver": "gufo").
+        {"gufo_args", "--gufo-args", "", "ARGS",
+         "Gufo-driver engines: extra arguments for `gufo serve`", "Engine Driver Options"},
+        {"gufo_think", "--gufo-think", "", "STRING",
+         "Gufo-driver engines: reasoning default on/off/auto (--think)", "Engine Driver Options"},
+        {"gufo_sessions", "--gufo-sessions", "", "STRING",
+         "Gufo-driver engines: preallocated GPU request sessions 1-8 (--sessions)", "Engine Driver Options"},
     },
     /*support*/ {
         {"system", {"linux"}, {{"cpu", {"x86_64", "arm64"}}}, "x86_64/ARM64 CPU, GPU"},

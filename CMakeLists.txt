@@ -3191,6 +3191,15 @@ if(BUILD_TESTING AND EXISTS "${_DS4_INSTALL_TEST_SRC}")
     add_cpp_ci_test(Ds4InstallParamsTest CI ON COMMAND test_ds4_install_params)
 endif()
 
+# gufo runs GGUF models as a llamacpp-recipe *engine driver*; the gufo command
+# line, its reserved flags and the GGUF pre-flight are unit-tested in isolation.
+set(_ENGINE_DRIVER_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/test/cpp/test_engine_driver.cpp")
+if(BUILD_TESTING AND EXISTS "${_ENGINE_DRIVER_TEST_SRC}")
+    add_executable(test_engine_driver test/cpp/test_engine_driver.cpp)
+    target_link_libraries(test_engine_driver PRIVATE lemonade-server-core)
+    add_cpp_ci_test(EngineDriverTest CI ON COMMAND test_engine_driver)
+endif()
+
 # llamacpp gfx950 (MI350) install gate: only the Linux + stable-channel asset is
 # published, so the shared Windows/Linux support row must not advertise Windows
 # or nightly installs for gfx950.

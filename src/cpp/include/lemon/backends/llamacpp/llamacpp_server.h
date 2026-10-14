@@ -60,6 +60,14 @@ private:
     // in the OpenAI `model` field. Rewrite it to the client-facing model id so
     // responses don't leak absolute filesystem paths (and usernames).
     json normalize_response_model(json response, const json& request) const;
+
+    // Engines whose requests must name the loaded model (gufo answers 404
+    // otherwise) get the request's `model` field rewritten; llama-server ignores it.
+    json with_engine_model_name(const json& request) const;
+
+    // The driver of the engine this model is loaded with ("llamacpp" unless a
+    // named engine selected another driver, e.g. "gufo").
+    std::string engine_driver_ = "llamacpp";
 };
 
 namespace llamacpp {

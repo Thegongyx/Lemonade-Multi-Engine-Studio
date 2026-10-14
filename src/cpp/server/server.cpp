@@ -6972,6 +6972,17 @@ std::string resolve_engine_exe(const std::string& id, const nlohmann::json& sect
     }
     return "";
 }
+
+// The driver of a registered engine ("llamacpp" unless its record names another,
+// e.g. "gufo"). Scanned engine directories are llama-server builds.
+std::string resolve_engine_driver(const std::string& id, const nlohmann::json& section) {
+    if (section.contains("custom_engines") && section["custom_engines"].is_object() &&
+        section["custom_engines"].contains(id) &&
+        section["custom_engines"][id].is_object()) {
+        return section["custom_engines"][id].value("driver", std::string("llamacpp"));
+    }
+    return "llamacpp";
+}
 }  // namespace
 
 void Server::handle_engines(const httplib::Request& req, httplib::Response& res) {
@@ -7027,6 +7038,7 @@ void Server::handle_engines(const httplib::Request& req, httplib::Response& res)
                                          {"path", path},
                                          {"backend", entry.value("backend", std::string(""))},
                                          {"device", entry.value("device", std::string(""))},
+                                         {"driver", entry.value("driver", std::string("llamacpp"))},
                                          {"recipe", "llamacpp"},
                                          {"source", "registered"},
                                          {"exists", exists},
@@ -7035,6 +7047,12 @@ void Server::handle_engines(const httplib::Request& req, httplib::Response& res)
                                          {"can_delete_files", true},
                                          {"can_uninstall", false},
                                          {"update_available", false}};
+                if (entry.contains("architectures") && entry["architectures"].is_array()) {
+                    engine["architectures"] = entry["architectures"];
+                }
+                if (entry.contains("tensor_types") && entry["tensor_types"].is_array()) {
+                    engine["tensor_types"] = entry["tensor_types"];
+                }
                 if (entry.contains("env") && entry["env"].is_object()) {
                     engine["env"] = entry["env"];
                 }
@@ -7151,17 +7169,26 @@ void Server::handle_engines(const httplib::Request& req, httplib::Response& res)
         // Non-llama.cpp engine backends installed on this host. The model-config
         // engine picker reads this endpoint, so a backend such as HaloWin (gdec)
         // must appear here too, not only under /system-info. The `recipe` field
-        // lets the UI match an engine to a model's recipe.
+        // lets the UI match an engine to a model's recipe. GGUF engines such as
+        // Gufo are llamacpp-recipe engine drivers instead (see engine_driver.h).
         {
-            const std::string halowin_path =
-                lemon::backends::HalowinServer::resolve_engine_binary(/*engine=*/false);
-            if (!halowin_path.empty()) {
-                engines.push_back({{"id", "halowin"},
-                                   {"name", "HaloWin (gfx1151)"},
-                                   {"path", halowin_path},
-                                   {"backend", "halowin"},
+            struct NonLlamaEngine {
+                const char* id;
+                const char* name;
+                std::string path;
+            };
+            const std::vector<NonLlamaEngine> engine_backends = {
+                {"halowin", "HaloWin (gfx1151)",
+                 lemon::backends::HalowinServer::resolve_engine_binary(/*engine=*/false)},
+            };
+            for (const auto& engine : engine_backends) {
+                if (engine.path.empty()) continue;
+                engines.push_back({{"id", engine.id},
+                                   {"name", engine.name},
+                                   {"path", engine.path},
+                                   {"backend", engine.id},
                                    {"device", ""},
-                                   {"recipe", "halowin"},
+                                   {"recipe", engine.id},
                                    {"source", "backend"},
                                    {"exists", true},
                                    {"can_register", false},
@@ -7192,6 +7219,15 @@ void Server::handle_engine_params(const httplib::Request& req, httplib::Response
         if (exe.empty()) {
             res.status = 404;
             res.set_content(nlohmann::json{{"error", "engine not found: " + id}}.dump(), "application/json");
+            return;
+        }
+        // This catalog is llama-server's `--help`; an engine with another driver
+        // has no equivalent, so report an empty catalog rather than parsing
+        // foreign help text (the UI disables the builder for it).
+        if (resolve_engine_driver(id, section) != "llamacpp") {
+            res.set_content(
+                nlohmann::json{{"engine", id}, {"params", nlohmann::json::array()}}.dump(),
+                "application/json");
             return;
         }
         std::string output;

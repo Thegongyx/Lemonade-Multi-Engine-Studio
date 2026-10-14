@@ -24,6 +24,13 @@ export type EngineInfo = {
   // family); non-llama.cpp backends (e.g. halowin) set it so the model config
   // can tell whether an engine is usable for a given model.
   recipe?: string;
+  // Program the engine record points at: absent/"llamacpp" is llama-server,
+  // "gufo" is the Gufo engine (which needs `--served-model-name` and its own
+  // argument namespace).
+  driver?: string;
+  // Optional capability hints a driver engine refuses to load outside of.
+  architectures?: string[];
+  tensor_types?: string[];
   exists: boolean;
   // Capabilities reported by GET /engines. A scanned engine can be registered
   // or hidden; a downloaded one is updated/uninstalled through the backend

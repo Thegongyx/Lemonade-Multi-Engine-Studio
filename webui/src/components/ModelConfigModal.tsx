@@ -28,8 +28,14 @@ export default function ModelConfigModal({
   // (e.g. halowin) tag their entries so the picker can tell them apart.
   const engineRecipe = (e: EngineInfo) => e.recipe || "llamacpp";
   const compatible = (e: EngineInfo) => engineRecipe(e) === effectiveRecipe;
-  const argsKey = isLlama ? "llamacpp_args" : `${effectiveRecipe}_args`;
   const [engine, setEngine] = useState("");
+  // An engine can drive a different program through the same recipe (a "gufo"
+  // driver runs gufo instead of llama-server); its arguments live in that
+  // driver's namespace, not in llamacpp_args.
+  const selectedDriver = engines.find((e) => e.id === engine)?.driver || "llamacpp";
+  const argsKey = selectedDriver === "gufo" ? "gufo_args"
+    : isLlama ? "llamacpp_args"
+    : `${effectiveRecipe}_args`;
   const [mode, setMode] = useState<"text" | "builder">("text");
   const [argsText, setArgsText] = useState("");
   const [envText, setEnvText] = useState("");
@@ -194,7 +200,7 @@ export default function ModelConfigModal({
                 const ok = compatible(e);
                 return (
                   <option key={e.id} value={e.id} disabled={!ok}>
-                    {e.name} ({e.backend || "?"}){ok ? "" : ` — ${t("models.engineWrongRecipe")}`}
+                    {e.name} ({e.backend || "?"}{e.driver && e.driver !== "llamacpp" ? `, ${e.driver}` : ""}){ok ? "" : ` — ${t("models.engineWrongRecipe")}`}
                   </option>
                 );
               })}
@@ -229,7 +235,7 @@ export default function ModelConfigModal({
             <div className="field">
               <div className="row between" style={{ marginBottom: 8 }}>
                 <span style={{ fontSize: 12, color: "var(--text-dim)" }}>{t("models.modeBuilder")}</span>
-                <button className="btn sm" onClick={() => setShowParams(true)} disabled={!engine || !isLlama}>
+                <button className="btn sm" onClick={() => setShowParams(true)} disabled={!engine || selectedDriver !== "llamacpp"}>
                   <Wand2 size={14} /> {t("models.openCatalog")}
                 </button>
               </div>

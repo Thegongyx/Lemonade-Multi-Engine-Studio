@@ -382,6 +382,10 @@ The following options are available depending on the recipe being used:
 | `--llamacpp BACKEND` | LlamaCpp backend to use | Auto-detected |
 | `--llamacpp-device DEVICES` | Comma-separated list of accelerator devices to use (e.g. Vulkan0) | `""` |
 | `--llamacpp-args ARGS` | Custom arguments to pass to llama-server | `""` |
+| `--llamacpp-env STRING` | Environment variables for llama-server, KEY=VALUE separated by newlines or ';' | `""` |
+| `--gufo-args ARGS` | Gufo-driver engines: extra arguments for `gufo serve` | `""` |
+| `--gufo-think STRING` | Gufo-driver engines: reasoning default on/off/auto (--think) | `""` |
+| `--gufo-sessions STRING` | Gufo-driver engines: preallocated GPU request sessions 1-8 (--sessions) | `""` |
 
 #### HRX GPU (experimental) (`llamacpp-hrx` recipe)
 
