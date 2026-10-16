@@ -5,7 +5,7 @@
 一个面向 **AMD Strix Halo（gfx1151）** 的大 MoE 本地推理引擎。
 目标模型是 **Qwen3.8-Flash-Next（qwen4exp 架构）** 及同结构微调。
 
-引擎本体是两个进程（**v0.0.7 起上游把 `gdec` 改名为 `qwenox`**）：
+引擎本体是两个进程（**v0.0.7 起上游把 `gdec` 改名为 `qwenox`，v0.0.8 项目统一改名 Qwenox**）：
 
 - `qwenox-engine-win.exe` —— 引擎，权重按 4-bit 存放于内存、GPU kernel 直读；
 - `qwenox-win.exe` —— OpenAI 兼容 HTTP 前端（GUI 程序；Lemonade 以 `--console` + 管道输出无窗口运行），Lemonade 只与它通信。
@@ -28,7 +28,7 @@ Lemonade 负责拉起两者、探活、按模型路由与清理。
 lemonade backends install halowin:win
 ```
 
-默认从 GitHub Release `v0.0.7-fix-2` 下载 `releases-windows.zip`（约 70 MB），解压到
+默认从 GitHub Release `v0.0.8` 下载 `qwenox-v0.0.8-windows.zip`（解压得到顶层 `qwenox\` 目录），解压到
 `<cache>\bin\halowin\win\`。自编译引擎可改为在 `config.json` 里指定目录：
 
 ```jsonc

@@ -149,7 +149,7 @@
     "npu": "v1.0.5"
   },
   "halowin": {
-    "win": "v0.0.7-fix-2"
+    "win": "v0.0.8"
   },
   "kokoro": {
     "cpu": "b17",

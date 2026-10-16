@@ -271,12 +271,20 @@ std::vector<ModelInfo> halowin_discover_models() {
 }  // namespace
 
 InstallParams HalowinServer::get_install_params(const std::string& /*backend*/,
-                                                const std::string& /*version*/) {
+                                                const std::string& version) {
     InstallParams params;
     params.repo = "IIIIIllllIIIIIlllll/gfx1151-engine";
-    // v0.0.4+ renamed the Windows release asset from release-windows.zip to
-    // releases-windows.zip; the pin in backend_versions.json tracks the tag.
-    params.filename = "releases-windows.zip";
+    // v0.0.8 renamed the Windows asset to qwenox-<tag>-windows.zip (and the
+    // project to Qwenox); v0.0.4..v0.0.7 shipped releases-windows.zip, and
+    // v0.0.1..v0.0.3 release-windows.zip (single "release").
+    if (version.rfind("v0.0.8", 0) == 0) {
+        params.filename = "qwenox-" + version + "-windows.zip";
+    } else if (version.rfind("v0.0.1", 0) == 0 || version.rfind("v0.0.2", 0) == 0 ||
+               version.rfind("v0.0.3", 0) == 0) {
+        params.filename = "release-windows.zip";
+    } else {
+        params.filename = "releases-windows.zip";
+    }
     return params;
 }
 
