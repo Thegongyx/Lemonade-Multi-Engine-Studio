@@ -45,6 +45,11 @@ export default function ModelConfigModal({
   const [prefillChunk, setPrefillChunk] = useState("");
   const [mtpGamma, setMtpGamma] = useState("");
   const [parallel, setParallel] = useState("1");
+  const [autoEvict, setAutoEvict] = useState<"" | "true" | "false">("");
+  const [evictIdle, setEvictIdle] = useState("");
+  const [downsizeIdle, setDownsizeIdle] = useState("");
+  const [evictWeight, setEvictWeight] = useState("");
+  const [lifecycleDefaults, setLifecycleDefaults] = useState({ evict: "300", downsize: "60", weight: "1.0" });
   const [showParams, setShowParams] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -60,8 +65,11 @@ export default function ModelConfigModal({
         const r = res as {
           effective?: Record<string, unknown>;
           saved?: Record<string, unknown>;
+          defaults?: Record<string, unknown>;
         };
         const eff = r.effective ?? r.saved ?? {};
+        const saved = r.saved ?? {};
+        const dflt = r.defaults ?? {};
         let eng = String(eff.llamacpp_engine ?? "");
         // Non-llama.cpp models have no llamacpp_engine option; default the picker
         // to this recipe's engine so the installed backend is shown as selected.
@@ -85,6 +93,19 @@ export default function ModelConfigModal({
         setPrefillChunk(String(eff.halowin_prefill_chunk ?? ""));
         setMtpGamma(String(eff.halowin_mtp_gamma ?? ""));
         setParallel(String(eff.halowin_parallel || "1"));
+        // Lifecycle options: show the user's saved override (empty = use default),
+        // with the resolved defaults as placeholders.
+        if (saved.auto_evict === true) setAutoEvict("true");
+        else if (saved.auto_evict === false) setAutoEvict("false");
+        else setAutoEvict("");
+        setEvictIdle(saved.evict_idle_timeout != null ? String(saved.evict_idle_timeout) : "");
+        setDownsizeIdle(saved.downsize_idle_timeout != null ? String(saved.downsize_idle_timeout) : "");
+        setEvictWeight(saved.evict_weight_factor != null ? String(saved.evict_weight_factor) : "");
+        setLifecycleDefaults({
+          evict: dflt.evict_idle_timeout != null ? String(dflt.evict_idle_timeout) : "300",
+          downsize: dflt.downsize_idle_timeout != null ? String(dflt.downsize_idle_timeout) : "60",
+          weight: dflt.evict_weight_factor != null ? String(dflt.evict_weight_factor) : "1.0",
+        });
       })
       .catch(() => {});
   }, [modelId, argsKey, effectiveRecipe, isLlama, engines]);
@@ -109,6 +130,17 @@ export default function ModelConfigModal({
     setSaving(true);
     setError("");
     try {
+      const evictN = evictIdle.trim() === "" ? null : Number(evictIdle);
+      const downN = downsizeIdle.trim() === "" ? null : Number(downsizeIdle);
+      const weightN = evictWeight.trim() === "" ? null : Number(evictWeight);
+      if (
+        (evictN !== null && (!Number.isFinite(evictN) || evictN <= 0)) ||
+        (downN !== null && (!Number.isFinite(downN) || downN <= 0)) ||
+        (weightN !== null && (!Number.isFinite(weightN) || weightN <= 0))
+      ) {
+        setError(t("models.lifecycleInvalid"));
+        return;
+      }
       const payload: Record<string, unknown> = {
         [argsKey]: finalArgs,
       };
@@ -128,6 +160,12 @@ export default function ModelConfigModal({
         // Concurrent serve slots (1-8).
         payload.halowin_parallel = parallel;
       }
+      // Lifecycle options: null clears the per-model override so it falls back
+      // to the global auto_evict / recipe defaults.
+      payload.auto_evict = autoEvict === "" ? null : autoEvict === "true";
+      payload.evict_idle_timeout = evictN;
+      payload.downsize_idle_timeout = downN;
+      payload.evict_weight_factor = weightN;
       await api.saveModelOptions(modelId, payload);
       setToast(t("models.saved"));
       onSaved();
@@ -161,6 +199,10 @@ export default function ModelConfigModal({
       setBuilder([]);
       setCtxSize("");
       setPrefillChunk("");
+      setAutoEvict("");
+      setEvictIdle("");
+      setDownsizeIdle("");
+      setEvictWeight("");
       setToast(t("models.resetDone"));
       onSaved();
       setTimeout(() => setToast(""), 1500);
@@ -327,6 +369,52 @@ export default function ModelConfigModal({
               <div className="hint">{t("models.parallelHint")}</div>
             </label>
           )}
+
+          <div className="cfg-group">
+            <div className="cfg-group-title">{t("models.lifecycle")}</div>
+            <label className="field">
+              <span>{t("models.autoEvict")}</span>
+              <select
+                value={autoEvict}
+                onChange={(e) => setAutoEvict(e.target.value as "" | "true" | "false")}
+              >
+                <option value="">{t("models.autoEvictGlobal")}</option>
+                <option value="true">{t("models.autoEvictOn")}</option>
+                <option value="false">{t("models.autoEvictOff")}</option>
+              </select>
+              <div className="hint">{t("models.autoEvictHint")}</div>
+            </label>
+            <div className="row" style={{ alignItems: "flex-start" }}>
+              <label className="field" style={{ flex: 1 }}>
+                <span>{t("models.evictIdle")}</span>
+                <input
+                  className="mono"
+                  value={evictIdle}
+                  onChange={(e) => setEvictIdle(e.target.value.replace(/[^0-9]/g, ""))}
+                  placeholder={lifecycleDefaults.evict}
+                />
+              </label>
+              <label className="field" style={{ flex: 1 }}>
+                <span>{t("models.downsizeIdle")}</span>
+                <input
+                  className="mono"
+                  value={downsizeIdle}
+                  onChange={(e) => setDownsizeIdle(e.target.value.replace(/[^0-9]/g, ""))}
+                  placeholder={lifecycleDefaults.downsize}
+                />
+              </label>
+            </div>
+            <label className="field">
+              <span>{t("models.evictWeight")}</span>
+              <input
+                className="mono"
+                value={evictWeight}
+                onChange={(e) => setEvictWeight(e.target.value.replace(/[^0-9.]/g, ""))}
+                placeholder={lifecycleDefaults.weight}
+              />
+              <div className="hint">{t("models.lifecycleHint")}</div>
+            </label>
+          </div>
 
           <label className="field">
             <span>{t("models.finalArgs")}</span>
