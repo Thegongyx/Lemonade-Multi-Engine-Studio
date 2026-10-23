@@ -26,7 +26,8 @@ type Field = {
 // ctx_size is deliberately absent: it is configured per model.
 const FIELDS: Field[] = [
   { key: "max_loaded_models", group: "concurrency", type: "int" },
-  { key: "auto_evict", group: "concurrency", type: "bool" },
+  { key: "evict_on_idle", group: "concurrency", type: "bool" },
+  { key: "evict_on_pressure", group: "concurrency", type: "bool" },
   { key: "auto_evict_threshold_pct", group: "concurrency", type: "float" },
   { key: "global_timeout", group: "inference", type: "int" },
   { key: "llamacpp.args", group: "inference", type: "text" },
@@ -111,12 +112,23 @@ export default function RuntimePage() {
     api.systemInfo().then(setSys).catch(() => {});
   };
 
+  const draftFromConfig = (source: Json): Record<string, string> => {
+    const next = Object.fromEntries(FIELDS.map((f) => [f.key, toText(getPath(source, f.key))]));
+    // The two recycling switches replaced the legacy single auto_evict switch:
+    // reflect its value when the new keys are absent, then default to off.
+    for (const key of ["evict_on_idle", "evict_on_pressure"]) {
+      if (next[key] === "") next[key] = toText(getPath(source, "auto_evict"));
+      if (next[key] === "") next[key] = "false";
+    }
+    return next;
+  };
+
   const loadConfig = () => {
     api
       .config()
       .then((r) => {
         setCfg(r);
-        setDraft(Object.fromEntries(FIELDS.map((f) => [f.key, toText(getPath(r, f.key))])));
+        setDraft(draftFromConfig(r));
       })
       .catch((e) => setError(String(e)));
     api.configDefaults().then(setDefaults).catch(() => {});
@@ -129,10 +141,12 @@ export default function RuntimePage() {
     return () => clearInterval(id);
   }, []);
 
-  const dirty = useMemo(
-    () => FIELDS.some((f) => draft[f.key] !== toText(getPath(cfg, f.key))),
-    [draft, cfg],
-  );
+  const dirty = useMemo(() => {
+    const baseline = draftFromConfig(cfg);
+    return FIELDS.some((f) => draft[f.key] !== baseline[f.key]);
+  }, [draft, cfg]);
+
+  const reset = () => setDraft(draftFromConfig(cfg));
 
   const save = async () => {
     setSaving(true);
@@ -149,8 +163,6 @@ export default function RuntimePage() {
       setSaving(false);
     }
   };
-
-  const reset = () => setDraft(Object.fromEntries(FIELDS.map((f) => [f.key, toText(getPath(cfg, f.key))])));
 
   const endpoint = `${location.origin}/v1`;
   const copy = async () => {

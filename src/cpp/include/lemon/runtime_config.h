@@ -50,6 +50,8 @@ public:
     std::string models_dir() const;
     int ctx_size() const;
     bool auto_evict() const;
+    bool evict_on_idle() const;
+    bool evict_on_pressure() const;
     double auto_evict_threshold_pct() const;
     bool inhibit_suspend() const;
 

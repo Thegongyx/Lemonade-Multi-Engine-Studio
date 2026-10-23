@@ -40,12 +40,11 @@ double GlobalVramMonitor::poll_vram_usage() const {
 
 void GlobalVramMonitor::monitor_loop() {
     while (running_) {
-        // Skip the (potentially expensive) VRAM query entirely unless the user
-        // has globally opted in. Per-model auto_evict still gets time-based
-        // handling from the EvictionEngine loop; VRAM-pressure eviction is a
-        // global concern and requires the global opt-in.
+        // Skip the (potentially expensive) VRAM query entirely unless pressure
+        // eviction is enabled. Idle recycling is time-based and is handled by
+        // the EvictionEngine loop, so it does not need this poll.
         RuntimeConfig* cfg = RuntimeConfig::global();
-        if (cfg && cfg->auto_evict()) {
+        if (cfg && cfg->evict_on_pressure()) {
             double pct = poll_vram_usage();
 
             std::lock_guard<std::mutex> lock(callback_mutex_);

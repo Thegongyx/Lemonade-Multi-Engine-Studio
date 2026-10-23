@@ -45,7 +45,8 @@ export default function ModelConfigModal({
   const [prefillChunk, setPrefillChunk] = useState("");
   const [mtpGamma, setMtpGamma] = useState("");
   const [parallel, setParallel] = useState("1");
-  const [autoEvict, setAutoEvict] = useState<"" | "true" | "false">("");
+  const [evictOnIdle, setEvictOnIdle] = useState<"" | "true" | "false">("");
+  const [evictOnPressure, setEvictOnPressure] = useState<"" | "true" | "false">("");
   const [evictIdle, setEvictIdle] = useState("");
   const [downsizeIdle, setDownsizeIdle] = useState("");
   const [evictWeight, setEvictWeight] = useState("");
@@ -95,9 +96,16 @@ export default function ModelConfigModal({
         setParallel(String(eff.halowin_parallel || "1"));
         // Lifecycle options: show the user's saved override (empty = use default),
         // with the resolved defaults as placeholders.
-        if (saved.auto_evict === true) setAutoEvict("true");
-        else if (saved.auto_evict === false) setAutoEvict("false");
-        else setAutoEvict("");
+        const pickSwitch = (specific: unknown): "" | "true" | "false" => {
+          if (specific === true) return "true";
+          if (specific === false) return "false";
+          // Legacy per-model auto_evict applies to both switches.
+          if (saved.auto_evict === true) return "true";
+          if (saved.auto_evict === false) return "false";
+          return "";
+        };
+        setEvictOnIdle(pickSwitch(saved.evict_on_idle));
+        setEvictOnPressure(pickSwitch(saved.evict_on_pressure));
         setEvictIdle(saved.evict_idle_timeout != null ? String(saved.evict_idle_timeout) : "");
         setDownsizeIdle(saved.downsize_idle_timeout != null ? String(saved.downsize_idle_timeout) : "");
         setEvictWeight(saved.evict_weight_factor != null ? String(saved.evict_weight_factor) : "");
@@ -161,8 +169,11 @@ export default function ModelConfigModal({
         payload.halowin_parallel = parallel;
       }
       // Lifecycle options: null clears the per-model override so it falls back
-      // to the global auto_evict / recipe defaults.
-      payload.auto_evict = autoEvict === "" ? null : autoEvict === "true";
+      // to the global switches / recipe defaults.
+      payload.evict_on_idle = evictOnIdle === "" ? null : evictOnIdle === "true";
+      payload.evict_on_pressure = evictOnPressure === "" ? null : evictOnPressure === "true";
+      // Migrate away from the legacy single per-model master switch.
+      payload.auto_evict = null;
       payload.evict_idle_timeout = evictN;
       payload.downsize_idle_timeout = downN;
       payload.evict_weight_factor = weightN;
@@ -199,7 +210,8 @@ export default function ModelConfigModal({
       setBuilder([]);
       setCtxSize("");
       setPrefillChunk("");
-      setAutoEvict("");
+      setEvictOnIdle("");
+      setEvictOnPressure("");
       setEvictIdle("");
       setDownsizeIdle("");
       setEvictWeight("");
@@ -373,16 +385,28 @@ export default function ModelConfigModal({
           <div className="cfg-group">
             <div className="cfg-group-title">{t("models.lifecycle")}</div>
             <label className="field">
-              <span>{t("models.autoEvict")}</span>
+              <span>{t("models.evictOnIdle")}</span>
               <select
-                value={autoEvict}
-                onChange={(e) => setAutoEvict(e.target.value as "" | "true" | "false")}
+                value={evictOnIdle}
+                onChange={(e) => setEvictOnIdle(e.target.value as "" | "true" | "false")}
               >
                 <option value="">{t("models.autoEvictGlobal")}</option>
                 <option value="true">{t("models.autoEvictOn")}</option>
                 <option value="false">{t("models.autoEvictOff")}</option>
               </select>
-              <div className="hint">{t("models.autoEvictHint")}</div>
+              <div className="hint">{t("models.evictOnIdleHint")}</div>
+            </label>
+            <label className="field">
+              <span>{t("models.evictOnPressure")}</span>
+              <select
+                value={evictOnPressure}
+                onChange={(e) => setEvictOnPressure(e.target.value as "" | "true" | "false")}
+              >
+                <option value="">{t("models.autoEvictGlobal")}</option>
+                <option value="true">{t("models.autoEvictOn")}</option>
+                <option value="false">{t("models.autoEvictOff")}</option>
+              </select>
+              <div className="hint">{t("models.evictOnPressureHint")}</div>
             </label>
             <div className="row" style={{ alignItems: "flex-start" }}>
               <label className="field" style={{ flex: 1 }}>

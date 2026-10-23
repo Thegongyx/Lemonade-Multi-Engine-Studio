@@ -220,7 +220,9 @@ When `lemond` starts, effective configuration is resolved by deep-merging settin
 | `log_max_files` | int | 5 | Max number of rotated log backup files to retain (.1 through .N); legacy oversized files are rotated into .1 and pruned over cycles |
 | `global_timeout` | int | 600 | Timeout in seconds for HTTP, inference, and readiness checks |
 | `max_loaded_models` | int | 1 | Max models per type slot. Use -1 for unlimited |
-| `auto_evict` | bool | false | Enable dynamic VRAM management based on idle time and global GPU memory pressure. Can be overridden per model. |
+| `evict_on_idle` | bool | false | Idle-time recycling: unload (or downsize) models after their per-model idle timeouts. Can be overridden per model. |
+| `evict_on_pressure` | bool | false | VRAM-pressure recycling: evict the most disposable model when global VRAM crosses the threshold. Can be overridden per model; requires the global monitor. |
+| `auto_evict` | bool | false | Legacy master switch used when `evict_on_idle` / `evict_on_pressure` are unset. |
 | `auto_evict_threshold_pct` | number | 0.90 | Global VRAM fraction at which pressure eviction is evaluated. Must be greater than 0 and at most 1.0; `0.90` means 90%. |
 | `broadcast` | bool | true | Enable or disable UDP broadcasting for server discovery |
 | `extra_models_dir` | string | "" | Secondary directory recursively scanned for GGUF model files. Empty disables extra discovery; existing paths must be readable by `lemond`. Top-level `chat`, `embeddings`, and `reranking` directories select how models run, see [Model Management](../../embeddable/models.md) |

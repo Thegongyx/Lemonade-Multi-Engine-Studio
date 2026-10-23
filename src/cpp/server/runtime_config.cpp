@@ -475,6 +475,31 @@ bool RuntimeConfig::auto_evict() const {
     return false;
 }
 
+// Idle and VRAM-pressure recycling are independent switches. When the new keys
+// were never set, fall back to the legacy auto_evict master switch so existing
+// configs keep their behaviour.
+bool RuntimeConfig::evict_on_idle() const {
+    std::shared_lock lock(mutex_);
+    if (config_.contains("evict_on_idle")) {
+        return config_["evict_on_idle"].get<bool>();
+    }
+    if (config_.contains("auto_evict")) {
+        return config_["auto_evict"].get<bool>();
+    }
+    return false;
+}
+
+bool RuntimeConfig::evict_on_pressure() const {
+    std::shared_lock lock(mutex_);
+    if (config_.contains("evict_on_pressure")) {
+        return config_["evict_on_pressure"].get<bool>();
+    }
+    if (config_.contains("auto_evict")) {
+        return config_["auto_evict"].get<bool>();
+    }
+    return false;
+}
+
 bool RuntimeConfig::inhibit_suspend() const {
     std::shared_lock lock(mutex_);
     if (config_.contains("inhibit_suspend")) {
@@ -910,6 +935,10 @@ void RuntimeConfig::validate(const std::string& key, const json& value) const {
     } else if (key == "auto_evict") {
         if (!value.is_boolean()) {
             throw std::invalid_argument("'auto_evict' must be a boolean");
+        }
+    } else if (key == "evict_on_idle" || key == "evict_on_pressure") {
+        if (!value.is_boolean()) {
+            throw std::invalid_argument("'" + key + "' must be a boolean");
         }
     } else if (key == "inhibit_suspend") {
         if (!value.is_boolean()) {

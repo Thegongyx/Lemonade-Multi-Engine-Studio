@@ -22,6 +22,8 @@ static const json& common_defaults() {
         {"merge_args", true},
         // Auto-eviction options (apply to every recipe)
         {"auto_evict", nullptr},          // nullptr means fallback to global config
+        {"evict_on_idle", nullptr},       // per-model idle switch; nullptr = follow global
+        {"evict_on_pressure", nullptr},   // per-model pressure switch; nullptr = follow global
         {"evict_idle_timeout", 300},      // Default hard idle timeout (5 mins)
         {"downsize_idle_timeout", 60},    // Default soft idle timeout (1 min)
         {"evict_weight_factor", 1.0},     // Eviction-protection weight (higher = more protected)
@@ -81,6 +83,8 @@ static std::vector<std::string> get_keys_for_recipe(const std::string& recipe) {
 
     // Add auto-eviction options for all recipes
     keys.push_back("auto_evict");
+    keys.push_back("evict_on_idle");
+    keys.push_back("evict_on_pressure");
     keys.push_back("evict_idle_timeout");
     keys.push_back("downsize_idle_timeout");
     keys.push_back("evict_weight_factor");

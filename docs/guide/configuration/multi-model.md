@@ -84,14 +84,20 @@ Models currently processing inference requests cannot be evicted until they fini
 
 In addition to the slot-based LRU policy, Lemonade can dynamically free VRAM based on **idle time** and **global GPU memory pressure**, so the server coexists with other GPU-heavy apps (ComfyUI, Blender, games) while minimizing cold starts. This feature is **opt-in** and disabled by default.
 
-Enable it globally:
+Enable either (or both) globally:
 
 ```
-lemonade config set auto_evict=true
-lemonade config set auto_evict_threshold_pct=0.90   # yield VRAM at 90% global usage
+lemonade config set evict_on_idle=true             # idle-time recycling
+lemonade config set evict_on_pressure=true         # VRAM-pressure recycling
+lemonade config set auto_evict_threshold_pct=0.90  # pressure threshold
 ```
 
-A background monitor samples global VRAM usage (NVIDIA via `nvidia-smi`, AMD via sysfs on Linux). When usage crosses `auto_evict_threshold_pct`, the eviction engine frees the most disposable model. When `auto_evict` is disabled, no VRAM polling occurs.
+The two behaviours are independent switches:
+
+- **`evict_on_idle`** — the EvictionEngine's 5 s loop unloads (or downsizes) models that have been idle past their per-model timeouts. Time-based, no VRAM poll.
+- **`evict_on_pressure`** — a background monitor samples global VRAM (NVIDIA via `nvidia-smi`, AMD via sysfs on Linux) and, when usage crosses `auto_evict_threshold_pct`, frees the most disposable model. No VRAM polling occurs while this switch is off.
+
+`auto_evict` is the legacy master switch: when `evict_on_idle` / `evict_on_pressure` are unset they fall back to it, so existing configs keep working. Prefer the two new keys.
 
 **Tiered degradation.** Idle models degrade in two stages rather than a binary loaded/unloaded:
 
@@ -114,7 +120,9 @@ These can be set per model on `/api/v1/load` (or globally where noted):
 
 | Setting | Scope | Default | Meaning |
 |---|---|---|---|
-| `auto_evict` | global + per-model | `false` | Opt this model/server into dynamic eviction |
+| `evict_on_idle` | global + per-model | `false` | Idle-time recycling (hard unload + soft downsize) |
+| `evict_on_pressure` | global + per-model | `false` | VRAM-pressure recycling (requires the global monitor) |
+| `auto_evict` | global + per-model | `false` | Legacy master switch; used when the two keys above are unset |
 | `auto_evict_threshold_pct` | global | `0.90` | Global VRAM fraction that triggers pressure eviction |
 | `downsize_idle_timeout` | per-model | `60` | Seconds idle before soft downsize |
 | `evict_idle_timeout` | per-model | `300` | Seconds idle before full eviction |

@@ -69,7 +69,10 @@ void EvictionEngine::evaluate_servers(double current_vram_pct) {
 
         auto now = std::chrono::steady_clock::now();
         double threshold = RuntimeConfig::global()->auto_evict_threshold_pct();
-        bool pressure_evict = (current_vram_pct >= threshold);
+        const bool under_pressure = (current_vram_pct >= threshold);
+        auto* cfg = RuntimeConfig::global();
+        const bool global_idle = cfg->evict_on_idle();
+        const bool global_pressure = cfg->evict_on_pressure();
 
         WrappedServer* best_candidate_for_eviction = nullptr;
         double highest_eviction_score = -1.0;
@@ -81,14 +84,25 @@ void EvictionEngine::evaluate_servers(double current_vram_pct) {
             // Pinned models must never be auto-evicted or downsized
             if (server->is_pinned()) continue;
 
-            // Check auto_evict config
-            bool auto_evict = RuntimeConfig::global()->auto_evict();
             auto recipe_opts = server->get_recipe_options().to_json();
-            if (recipe_opts.contains("auto_evict") && recipe_opts["auto_evict"].is_boolean()) {
-                auto_evict = recipe_opts["auto_evict"].get<bool>();
-            }
 
-            if (!auto_evict) continue;
+            // Idle recycling and VRAM-pressure recycling are independent
+            // switches. A per-model key wins over the legacy per-model
+            // auto_evict, which wins over the global switch (that switch itself
+            // falls back to auto_evict for older configs).
+            auto resolve_enabled = [&](const char* key, bool global_value) -> bool {
+                if (recipe_opts.contains(key) && recipe_opts[key].is_boolean()) {
+                    return recipe_opts[key].get<bool>();
+                }
+                if (recipe_opts.contains("auto_evict") && recipe_opts["auto_evict"].is_boolean()) {
+                    return recipe_opts["auto_evict"].get<bool>();
+                }
+                return global_value;
+            };
+            const bool idle_enabled = resolve_enabled("evict_on_idle", global_idle);
+            const bool pressure_enabled = resolve_enabled("evict_on_pressure", global_pressure);
+
+            if (!idle_enabled && !pressure_enabled) continue;
 
             long evict_timeout_sec = 300;
             long downsize_timeout_sec = 60;
@@ -120,24 +134,23 @@ void EvictionEngine::evaluate_servers(double current_vram_pct) {
             ModelState state = server->get_state();
 
             // 1. Time-based hard idle eviction
-            if (idle_ms >= evict_timeout_sec * 1000 && state != ModelState::EVICTING && state != ModelState::UNLOADED && state != ModelState::IN_USE) {
+            if (idle_enabled && idle_ms >= evict_timeout_sec * 1000 && state != ModelState::EVICTING && state != ModelState::UNLOADED && state != ModelState::IN_USE) {
                 LOG(INFO) << "Model " << server->get_model_name() << " reached evict idle timeout (" << evict_timeout_sec << "s). Evicting." << std::endl;
                 server->set_state(ModelState::EVICTING);
                 best_candidate_for_eviction = server;
-                pressure_evict = true;
                 break;
             }
 
             // 2. Time-based soft idle (downsize) - collect the candidate only. The
             // model is not claimed here; try_begin_downsize() below atomically
             // re-checks that it is still idle and transitions it to DOWNSIZING.
-            if (idle_ms >= downsize_timeout_sec * 1000 && state == ModelState::READY) {
+            if (idle_enabled && idle_ms >= downsize_timeout_sec * 1000 && state == ModelState::READY) {
                 LOG(INFO) << "Model " << server->get_model_name() << " reached downsize idle timeout (" << downsize_timeout_sec << "s). Marking for downsize." << std::endl;
                 models_to_downsize.push_back(server->get_model_name());
             }
 
             // 3. VRAM Pressure tracking
-            if (pressure_evict && state != ModelState::EVICTING && state != ModelState::UNLOADED && state != ModelState::IN_USE) {
+            if (pressure_enabled && under_pressure && state != ModelState::EVICTING && state != ModelState::UNLOADED && state != ModelState::IN_USE) {
                 if (eviction_score > highest_eviction_score) {
                     highest_eviction_score = eviction_score;
                     best_candidate_for_eviction = server;
@@ -145,7 +158,7 @@ void EvictionEngine::evaluate_servers(double current_vram_pct) {
             }
         }
 
-        if (pressure_evict && best_candidate_for_eviction) {
+        if (best_candidate_for_eviction) {
             model_to_evict = best_candidate_for_eviction->get_model_name();
             best_candidate_for_eviction->set_state(ModelState::EVICTING);
             LOG(INFO) << "Eviction Engine unloading model: " << model_to_evict << " due to score/pressure/idle." << std::endl;
