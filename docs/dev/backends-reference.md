@@ -12,7 +12,6 @@ the generator instead. Prose outside the markers is preserved. -->
 | `acestep` | ACE-Step | yes | no | cuda, rocm, vulkan |
 | `ds4` | DwarfStar4 (experimental) | no | yes | rocm |
 | `flm` | FastFlowLM NPU | no | yes | npu |
-| `halowin` | HaloWin (gfx1151) | no | yes | win |
 | `kokoro` | Kokoro | no | no | cpu, metal |
 | `llamacpp` | Llama.cpp GPU | yes | yes | cpu, cuda, metal, rocm, system, vulkan |
 | `llamacpp-hrx` | HRX GPU (experimental) | no | yes | hrx |
@@ -38,7 +37,6 @@ the generator instead. Prose outside the markers is preserved. -->
 | `acestep` | rocm | linux, windows | amd_gpu (gfx103X, gfx110X, gfx1150, gfx1151, gfx1152, gfx120X) |
 | `ds4` | rocm | linux | amd_gpu (gfx1151) |
 | `flm` | npu | linux, windows | amd_npu (XDNA2) |
-| `halowin` | win | windows | amd_gpu (gfx1151) |
 | `kokoro` | metal | macos | metal |
 | `kokoro` | cpu | linux, windows | cpu (x86_64) |
 | `llamacpp` | system | linux | cpu (arm64, x86_64) |
@@ -108,19 +106,6 @@ the generator instead. Prose outside the markers is preserved. -->
 | `ctx_size` | `--ctx-size` | SIZE | -1 | Context size for the model |
 | `flm_args` | `--flm-args` | ARGS | "" | Safe flm serve tuning args: --pmode, --prefill-chunk-len, --img-pre-resize, --socket, --q-len, --preemption |
 
-#### `halowin` — HaloWin (gfx1151)
-
-| Option | CLI flag | Type | Default | Description |
-|--------|----------|------|---------|-------------|
-| `ctx_size` | `--ctx-size` | SIZE | -1 | Context size for the model |
-| `halowin_args` | `--halowin-args` | ARGS | "" | Extra arguments passed to the qwenox API (OpenAI front-end) |
-| `halowin_engine_args` | `--halowin-engine-args` | ARGS | "" | Extra arguments passed to the qwenox engine |
-| `halowin_bin_dir` | `--halowin-bin-dir` | STRING | "" | Directory containing qwenox-engine-win.exe / qwenox-win.exe; overrides the installed engine |
-| `halowin_models_dir` | `--halowin-models-dir` | STRING | "" | Directory scanned for .hgn model sets |
-| `halowin_prefill_chunk` | `--halowin-prefill-chunk` | STRING | "" | Prefill chunk in tokens (QWENOX_PREFILL_CHUNK); Windows 4096 saves ~3.5 GiB VRAM |
-| `halowin_mtp_gamma` | `--halowin-mtp-gamma` | STRING | "" | MTP speculative draft length 1-8 (QWENOX_SPEC_GAMMA); empty = upstream auto (greedy 4, sampling adaptive 3-7) |
-| `halowin_parallel` | `--halowin-parallel` | STRING | "" | Concurrent serve slots 1-8 (QWENOX_PARALLEL); slots share the paged KV pool, each extra slot costs ~0.12 GiB VRAM |
-
 #### `llamacpp` — Llama.cpp GPU
 
 | Option | CLI flag | Type | Default | Description |
@@ -134,6 +119,12 @@ the generator instead. Prose outside the markers is preserved. -->
 | `gufo_args` | `--gufo-args` | ARGS | "" | Gufo-driver engines: extra arguments for `gufo serve` |
 | `gufo_think` | `--gufo-think` | STRING | "" | Gufo-driver engines: reasoning default on/off/auto (--think) |
 | `gufo_sessions` | `--gufo-sessions` | STRING | "" | Gufo-driver engines: preallocated GPU request sessions 1-8 (--sessions) |
+| `halowin_engine_args` | `--halowin-engine-args` | ARGS | "" | HaloWin-driver engines: extra arguments for the qwenox engine process |
+| `halowin_args` | `--halowin-args` | ARGS | "" | HaloWin-driver engines: extra arguments for the qwenox OpenAI front-end |
+| `halowin_parallel` | `--halowin-parallel` | STRING | "" | HaloWin-driver engines: concurrent serve slots 1-8 (QWENOX_PARALLEL) |
+| `halowin_prefill_chunk` | `--halowin-prefill-chunk` | STRING | "" | HaloWin-driver engines: prefill chunk tokens (QWENOX_PREFILL_CHUNK) |
+| `halowin_mtp_gamma` | `--halowin-mtp-gamma` | STRING | "" | HaloWin-driver engines: fixed MTP draft length 1-8 (QWENOX_SPEC_GAMMA) |
+| `halowin_moe_a4` | `--halowin-moe-a4` | STRING | "" | HaloWin-driver engines: prefill 4-bit MoE activation 0-3 (QWENOX_MOE_A4; empty = 3) |
 
 #### `llamacpp-hrx` — HRX GPU (experimental)
 

@@ -386,6 +386,12 @@ The following options are available depending on the recipe being used:
 | `--gufo-args ARGS` | Gufo-driver engines: extra arguments for `gufo serve` | `""` |
 | `--gufo-think STRING` | Gufo-driver engines: reasoning default on/off/auto (--think) | `""` |
 | `--gufo-sessions STRING` | Gufo-driver engines: preallocated GPU request sessions 1-8 (--sessions) | `""` |
+| `--halowin-engine-args ARGS` | HaloWin-driver engines: extra arguments for the qwenox engine process | `""` |
+| `--halowin-args ARGS` | HaloWin-driver engines: extra arguments for the qwenox OpenAI front-end | `""` |
+| `--halowin-parallel STRING` | HaloWin-driver engines: concurrent serve slots 1-8 (QWENOX_PARALLEL) | `""` |
+| `--halowin-prefill-chunk STRING` | HaloWin-driver engines: prefill chunk tokens (QWENOX_PREFILL_CHUNK) | `""` |
+| `--halowin-mtp-gamma STRING` | HaloWin-driver engines: fixed MTP draft length 1-8 (QWENOX_SPEC_GAMMA) | `""` |
+| `--halowin-moe-a4 STRING` | HaloWin-driver engines: prefill 4-bit MoE activation 0-3 (QWENOX_MOE_A4; empty = 3) | `""` |
 
 #### HRX GPU (experimental) (`llamacpp-hrx` recipe)
 
@@ -478,19 +484,6 @@ The following options are available depending on the recipe being used:
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--openmoss BACKEND` | OpenMOSS TTS backend to use | Auto-detected |
-
-#### HaloWin (gfx1151) (`halowin` recipe)
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--ctx-size SIZE` | Context size for the model | auto |
-| `--halowin-args ARGS` | Extra arguments passed to the qwenox API (OpenAI front-end) | `""` |
-| `--halowin-engine-args ARGS` | Extra arguments passed to the qwenox engine | `""` |
-| `--halowin-bin-dir STRING` | Directory containing qwenox-engine-win.exe / qwenox-win.exe; overrides the installed engine | `""` |
-| `--halowin-models-dir STRING` | Directory scanned for .hgn model sets | `""` |
-| `--halowin-prefill-chunk STRING` | Prefill chunk in tokens (QWENOX_PREFILL_CHUNK); Windows 4096 saves ~3.5 GiB VRAM | `""` |
-| `--halowin-mtp-gamma STRING` | MTP speculative draft length 1-8 (QWENOX_SPEC_GAMMA); empty = upstream auto (greedy 4, sampling adaptive 3-7) | `""` |
-| `--halowin-parallel STRING` | Concurrent serve slots 1-8 (QWENOX_PARALLEL); slots share the paged KV pool, each extra slot costs ~0.12 GiB VRAM | `""` |
 <!-- END GENERATED: cli-recipe-options -->
 **Notes:**
 - Unspecified options will use the backend's default values

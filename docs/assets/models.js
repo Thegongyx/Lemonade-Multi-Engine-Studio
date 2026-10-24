@@ -7,7 +7,6 @@ const RECIPE_PRIORITY = [
   'acestep',
   'ds4',
   'flm',
-  'halowin',
   'llamacpp-hrx',
   'kokoro',
   'llamacpp',
@@ -37,8 +36,7 @@ const RECIPE_DISPLAY_NAMES = {
   acestep: 'ACE-Step',
   onnxruntime: 'ONNX Runtime',
   trellis: 'TRELLIS.2',
-  openmoss: 'OpenMOSS TTS',
-  halowin: 'HaloWin'
+  openmoss: 'OpenMOSS TTS'
 };
 /* END GENERATED: models-js-recipes */
 

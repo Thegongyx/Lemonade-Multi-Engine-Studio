@@ -17,7 +17,6 @@
 #include "lemon/ollama_api.h"
 #include "lemon/backends/backend_descriptor_registry.h"
 #include "lemon/backends/cloud/cloud_server.h"
-#include "lemon/backends/halowin/halowin_server.h"
 #include "lemon/backends/sdcpp/sdcpp_server.h"
 #include "lemon/backends/thenoise/thenoise_server.h"
 #include "lemon/backends/backend_utils.h"
@@ -7163,39 +7162,6 @@ void Server::handle_engines(const httplib::Request& req, httplib::Response& res)
                     }
                     engines.push_back(std::move(engine));
                 }
-            }
-        }
-
-        // Non-llama.cpp engine backends installed on this host. The model-config
-        // engine picker reads this endpoint, so a backend such as HaloWin (gdec)
-        // must appear here too, not only under /system-info. The `recipe` field
-        // lets the UI match an engine to a model's recipe. GGUF engines such as
-        // Gufo are llamacpp-recipe engine drivers instead (see engine_driver.h).
-        {
-            struct NonLlamaEngine {
-                const char* id;
-                const char* name;
-                std::string path;
-            };
-            const std::vector<NonLlamaEngine> engine_backends = {
-                {"halowin", "HaloWin (gfx1151)",
-                 lemon::backends::HalowinServer::resolve_engine_binary(/*engine=*/false)},
-            };
-            for (const auto& engine : engine_backends) {
-                if (engine.path.empty()) continue;
-                engines.push_back({{"id", engine.id},
-                                   {"name", engine.name},
-                                   {"path", engine.path},
-                                   {"backend", engine.id},
-                                   {"device", ""},
-                                   {"recipe", engine.id},
-                                   {"source", "backend"},
-                                   {"exists", true},
-                                   {"can_register", false},
-                                   {"can_hide", false},
-                                   {"can_delete_files", false},
-                                   {"can_uninstall", true},
-                                   {"update_available", false}});
             }
         }
 

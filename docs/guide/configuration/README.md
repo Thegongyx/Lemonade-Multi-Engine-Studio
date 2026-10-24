@@ -66,16 +66,6 @@ When `lemond` starts, effective configuration is resolved by deep-merging settin
     "prefer_system": false
   },
   "global_timeout": 600,
-  "halowin": {
-    "halowin_args": "",
-    "halowin_bin_dir": "",
-    "halowin_engine_args": "",
-    "halowin_models_dir": "",
-    "halowin_mtp_gamma": "",
-    "halowin_parallel": "",
-    "halowin_prefill_chunk": "",
-    "win_bin": "builtin"
-  },
   "host": "localhost",
   "hrx": {
     "args": "",

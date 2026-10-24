@@ -170,7 +170,6 @@ set(LEMON_BACKENDS
     "onnxruntime|onnxruntime"
     "trellis|trellis"
     "openmoss|openmoss"
-    "halowin|halowin"
 )
 
 # ============================================================
@@ -1067,6 +1066,12 @@ foreach(_backend_entry ${LEMON_BACKENDS})
     string(APPEND LEMON_CAPABILITY_ENTRIES
         "        { &lemon::backends::${_backend_stem}::descriptor, lemon::backends::${_backend_stem}::capabilities() },\n")
 endforeach()
+
+# HaloWin is no longer a registered recipe: the llamacpp "halowin" engine driver
+# owns that engine now (see backends/llamacpp/engine_driver.h). The server class
+# stays compiled because the driver delegates the two-process lifecycle to it.
+list(APPEND LEMON_BACKEND_FACTORY_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/cpp/server/backends/halowin/halowin_server.cpp)
 
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/cpp/server/backends/backend_descriptors_generated.h.in

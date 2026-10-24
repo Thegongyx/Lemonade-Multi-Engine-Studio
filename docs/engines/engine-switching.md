@@ -324,3 +324,45 @@ halowin 之类保持独立 recipe（`.hgn` 与 GGUF 无共享实体）。
 5. **UI 改动需重建 web-app**：本 fork 的界面是 `webui/`（Vite，`npm run build` → `webui/dist`），
    部署时把 `webui/dist/*` 覆盖到服务的 `resources/web-app/`。注意 **CMake 的 `web-app` 目标
    构建的是上游 renderer，不是 fork 界面** —— 用错会把这个界面换掉。
+
+## 13. 第二个驱动：halowin（2026-10-24）
+
+上游 gfx1151-engine 从 G3.3 起支持**纯 GGUF**（与 llama.cpp 同一批文件），所以 HaloWin 也能当作
+`llamacpp` 配方里的引擎驱动，与 gufo 并列 —— 同一个 GGUF 模型条目在 llama.cpp / gufo / halowin
+之间切换。
+
+**与 gufo 的机制差异**：gufo 是单进程、OpenAI 直通，驱动层自己拼 argv；HaloWin 是**双进程**
+（`qwenox-engine-win.exe` + `qwenox-win.exe`）、调参走 `QWENOX_*` 环境变量、前端与引擎端口分离，
+这套生命周期已经在 `halowin` 后端里实现，所以驱动层**整单委托**给它，不重复实现。
+
+| 位置 | 内容 |
+|---|---|
+| `include/lemon/backends/llamacpp/engine_driver.h` | 新增驱动名 `kHalowin` |
+| `server/backends/llamacpp/llamacpp_server.cpp` | `load()` 在 `driver == "halowin"` 时构造 `HalowinServer`、按引擎记录的目录 `set_bin_dir()`，然后 `load()` 并返回；`unload` / `is_backend_alive` / `chat_completion` / `completion` / `responses` / `forward_streaming_request` 全部转发给委托对象 |
+| `server/backends/halowin/halowin_server.cpp` | 新增 GGUF 分支（`main` 是 `.gguf` 时走 `QWENOX_GGUF` + `QWENOX_GGUF_DENSE=1`，MTP 改由 `QWENOX_GGUF_MTP` 传入，`overlay`/`ngram` 不参与）；接受 llamacpp 侧的 `draft`/`mmproj` 检查点名；缺 `tokenizer` 检查点时向上 3 层找 `<权重目录>/tokenizer/tokenizer.json`；`set_bin_dir()` 让引擎从注册记录的目录解析 |
+| `include/lemon/backends/llamacpp/llamacpp.h` | 新增 `halowin_engine_args` / `halowin_args` / `halowin_parallel` / `halowin_prefill_chunk` / `halowin_mtp_gamma`（否则 `get_keys_for_recipe()` 会过滤掉） |
+| `webui/src/components/ModelConfigModal.tsx` | 参数框按驱动取键：`halowin` → `halowin_engine_args` |
+| `docs/engines/halowin.md` | 新增「GGUF 权重（llamacpp 驱动）」一节 |
+
+**引擎注册**（`config.json`）：
+
+```jsonc
+"halowin": {
+  "path": "…\\gfx1151-engine\\build\\qwenox-win.exe",
+  "backend": "rocm", "driver": "halowin"
+}
+```
+
+`halowin` 配方已随之删除（不再有同名冲突，故引擎 id 直接用 `halowin`）。
+
+**实测（Streaming / 双进程 / 回归，同一模型条目 `Qwen3.8-Flash-Next-Q4-K-XL`，ctx 32768）**
+
+| 项 | 结果 |
+|---|---|
+| halowin 驱动加载 | 25–29 s；`qwenox-engine-win.exe`（约 32 GB 驻留）+ `qwenox-win.exe`；`--tokenizer` 指到自动找到的 `<repo>\tokenizer` |
+| 对话 / 流式 | 38.2 tok/s（MTP 44 提议 / 26 接受）；SSE 36 chunk 正常 |
+| 卸载 | 双进程均退出，无残留 |
+| 切回 gufo | 21.6 s 加载、36.7 tok/s，行为不变（无回归） |
+
+**遗留**：WebUI 的"添加自编引擎"仍只认 `llama-server.exe`，halowin / gufo 引擎需手写 `config.json`；
+`halowin` 配方删除后不再有引擎自动下载与 hgn 目录自动发现，模型必须显式登记 checkpoints。
