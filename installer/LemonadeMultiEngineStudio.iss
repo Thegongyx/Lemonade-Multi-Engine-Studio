@@ -3,7 +3,7 @@
 ; Requires Inno Setup 6 (ISCC.exe).
 
 #define AppName "Lemonade Multi-Engine Studio"
-#define AppVersion "0.3.0"
+#define AppVersion "0.4.0"
 #define AppExe "LemonadeMultiEngineStudio.exe"
 
 [Setup]
