@@ -29,6 +29,10 @@ public:
 
     ~HalowinServer() override;
 
+    // llamacpp-recipe driver path: resolve qwenox-*.exe from the registered
+    // engine's directory instead of the halowin recipe's own lookup.
+    void set_bin_dir(const std::string& dir) { bin_dir_override_ = dir; }
+
     void load(const std::string& model_name,
               const ModelInfo& model_info,
               const RecipeOptions& options,
@@ -47,10 +51,14 @@ private:
     bool wait_for_halowin_ready(long timeout_seconds);
     void stop_engine();
 
+    // resolve_engine_binary with the driver's bin_dir_override_ taking precedence.
+    std::string resolve_binary(bool engine) const;
+
     ProcessHandle engine_handle_{nullptr, 0};
     mutable std::mutex engine_mutex_;
     int engine_port_ = 0;
     bool is_loaded_ = false;
+    std::string bin_dir_override_;
 };
 
 namespace halowin {

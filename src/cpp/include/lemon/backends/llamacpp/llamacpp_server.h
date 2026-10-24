@@ -9,6 +9,8 @@
 namespace lemon {
 namespace backends {
 
+class HalowinServer;
+
 class LlamaCppServer : public WrappedServer, public IEmbeddingsServer, public IRerankingServer, public ISlotsServer, public ITokenizerServer {
 public:
     static InstallParams get_install_params(const std::string& backend, const std::string& version);
@@ -26,6 +28,8 @@ public:
              bool do_not_upgrade = false) override;
 
     void unload() override;
+
+    bool is_backend_alive() const override;
 
     // Downsize the model on soft idle
     bool downsize() override;
@@ -68,6 +72,11 @@ private:
     // The driver of the engine this model is loaded with ("llamacpp" unless a
     // named engine selected another driver, e.g. "gufo").
     std::string engine_driver_ = "llamacpp";
+
+    // Set when a halowin-driver engine is selected: that engine is a two-process
+    // stack (qwenox engine + OpenAI front-end) owned by the halowin backend, so
+    // this server delegates the whole lifecycle instead of driving one child.
+    std::unique_ptr<HalowinServer> halowin_delegate_;
 };
 
 namespace llamacpp {

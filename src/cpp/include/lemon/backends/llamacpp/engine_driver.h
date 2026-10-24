@@ -16,6 +16,10 @@ namespace engine_driver {
 // models it can actually load.
 inline constexpr const char* kLlamacpp = "llamacpp";
 inline constexpr const char* kGufo = "gufo";
+// HaloWin keeps a two-process topology (qwenox engine + OpenAI front-end) and its
+// own tuning options, so the llamacpp backend delegates to the halowin backend
+// instead of building a command line here.
+inline constexpr const char* kHalowin = "halowin";
 
 // The HTTP endpoint that returns 200 only once the model is loaded.
 std::string readiness_endpoint(const std::string& driver);

@@ -1,3 +1,4 @@
+#include "lemon/backends/halowin/halowin_server.h"
 #include "lemon/backends/llamacpp/llamacpp_server.h"
 #include "lemon/backends/llamacpp/engine_driver.h"
 #include "lemon/backends/llamacpp/llamacpp.h"
@@ -621,12 +622,25 @@ void LlamaCppServer::load(const std::string& model_name,
     // different program with its own command line (see engine_driver.h). The
     // engine record, resolved paths, port and executable above are shared, so
     // everything below this point is llama-server specific.
+    if (custom_engine.valid && custom_engine.driver == engine_driver::kHalowin) {
+        // HaloWin keeps a two-process topology (qwenox engine + OpenAI front-end)
+        // plus its own QWENOX_* tuning surface, all of which the halowin backend
+        // already implements: delegate the lifecycle and the requests to it.
+        halowin_delegate_ =
+            std::make_unique<HalowinServer>(log_level_, model_manager_, backend_manager_);
+        halowin_delegate_->set_bin_dir(
+            utils::path_to_utf8(utils::path_from_utf8(custom_engine.path).parent_path()));
+        halowin_delegate_->load(model_name, model_info, options, do_not_upgrade);
+        engine_driver_ = engine_driver::kHalowin;
+        return;
+    }
+
     if (custom_engine.valid && custom_engine.driver != engine_driver::kLlamacpp) {
         if (custom_engine.driver != engine_driver::kGufo) {
             throw std::invalid_argument(
                 "Engine '" + llamacpp_engine + "' declares unknown driver '" +
-                custom_engine.driver + "' (expected '" + engine_driver::kLlamacpp + "' or '" +
-                engine_driver::kGufo + "')");
+                custom_engine.driver + "' (expected '" + engine_driver::kLlamacpp + "', '" +
+                engine_driver::kGufo + "' or '" + engine_driver::kHalowin + "')");
         }
         engine_driver::validate_model(llamacpp_engine, custom_engine.architectures,
                                       custom_engine.tensor_types, gguf_path, model_name);
@@ -1004,6 +1018,11 @@ void LlamaCppServer::load(const std::string& model_name,
 }
 
 void LlamaCppServer::unload() {
+    if (halowin_delegate_) {
+        halowin_delegate_->unload();
+        halowin_delegate_.reset();
+        return;
+    }
     stop_backend_watchdog();
     LOG(INFO, "LlamaCpp") << "Unloading model..." << std::endl;
 
@@ -1011,6 +1030,11 @@ void LlamaCppServer::unload() {
     if (has_process_handle(handle)) {
         ProcessManager::stop_process(handle);
     }
+}
+
+bool LlamaCppServer::is_backend_alive() const {
+    if (halowin_delegate_) return halowin_delegate_->is_backend_alive();
+    return WrappedServer::is_backend_alive();
 }
 
 bool LlamaCppServer::downsize() {
@@ -1060,6 +1084,7 @@ json LlamaCppServer::with_engine_model_name(const json& request) const {
 }
 
 json LlamaCppServer::chat_completion(const json& request) {
+    if (halowin_delegate_) return halowin_delegate_->chat_completion(request);
     return normalize_response_model(
         forward_request("/v1/chat/completions",
                         llamacpp::sanitize_tool_schema_limits(
@@ -1069,6 +1094,7 @@ json LlamaCppServer::chat_completion(const json& request) {
 }
 
 json LlamaCppServer::completion(const json& request) {
+    if (halowin_delegate_) return halowin_delegate_->completion(request);
     return normalize_response_model(
         forward_request("/v1/completions",
                         JsonUtils::with_legacy_max_tokens_alias(
@@ -1097,6 +1123,7 @@ json LlamaCppServer::tokenize(const json& request_body) {
 }
 
 json LlamaCppServer::responses(const json& request) {
+    if (halowin_delegate_) return halowin_delegate_->responses(request);
     return normalize_response_model(
         forward_request("/v1/responses",
                         llamacpp::sanitize_tool_schema_limits(request)),
@@ -1109,6 +1136,11 @@ void LlamaCppServer::forward_streaming_request(const std::string& endpoint,
                                                bool sse,
                                                long timeout_seconds,
                                                TelemetryCallback telemetry_callback) {
+    if (halowin_delegate_) {
+        halowin_delegate_->forward_streaming_request(
+            endpoint, request_body, sink, sse, timeout_seconds, telemetry_callback);
+        return;
+    }
     std::string body = request_body;
     if (endpoint == "/v1/chat/completions" || endpoint == "/v1/responses") {
         json request = json::parse(request_body, nullptr, false);
