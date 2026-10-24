@@ -361,6 +361,16 @@ std::string HalowinServer::resolve_engine_binary(bool engine) {
     return find_executable_in_dir(install_dir, exe);
 }
 
+std::string HalowinServer::resolve_binary(bool engine) const {
+    if (!bin_dir_override_.empty()) {
+        std::error_code ec;
+        const fs::path candidate =
+            utils::path_from_utf8(bin_dir_override_) / (engine ? kEngineExe : kApiExe);
+        if (fs::exists(candidate, ec)) return utils::path_to_utf8(candidate);
+    }
+    return resolve_engine_binary(engine);
+}
+
 bool HalowinServer::is_backend_alive() const {
     if (was_watchdog_triggered()) return false;
 
@@ -447,33 +457,58 @@ void HalowinServer::load(const std::string& model_name,
     const std::string main_path = model_file("main");
     if (main_path.empty()) {
         throw std::runtime_error(
-            "HaloWin model '" + model_name + "' is missing its main .hgn checkpoint");
+            "HaloWin model '" + model_name +
+            "' is missing its main checkpoint (.hgn bundle or GGUF)");
     }
+    // GGUF weights reuse llama.cpp's files: the first shard goes positionally,
+    // MTP is a sidecar env var, and the optional vision tower is an mmproj.
+    const bool is_gguf =
+        lower_ascii(utils::path_from_utf8(main_path).extension().string()) == ".gguf";
 
     std::string tokenizer_dir = model_info.resolved_path("tokenizer");
     if (tokenizer_dir.empty()) tokenizer_dir = model_info.checkpoint("tokenizer");
+    if (tokenizer_dir.empty()) {
+        // GGUF entries usually carry no explicit tokenizer checkpoint; upstream
+        // keeps tokenizer.json in a tokenizer/ folder beside the weights.
+        std::error_code ec;
+        fs::path dir = utils::path_from_utf8(main_path).parent_path();
+        for (int depth = 0; depth < 3 && !dir.empty(); ++depth) {
+            if (fs::exists(dir / "tokenizer" / "tokenizer.json", ec)) {
+                tokenizer_dir = utils::path_to_utf8(dir / "tokenizer");
+                break;
+            }
+            const fs::path parent = dir.parent_path();
+            if (parent == dir) break;
+            dir = parent;
+        }
+    }
     if (tokenizer_dir.empty() ||
         !fs::exists(utils::path_from_utf8(tokenizer_dir) / "tokenizer.json")) {
         throw std::runtime_error(
             "HaloWin model '" + model_name +
-            "' is missing tokenizer/tokenizer.json (resolved: '" + tokenizer_dir + "')");
+            "' is missing tokenizer/tokenizer.json (resolved: '" + tokenizer_dir +
+            "'); place tokenizer.json in <weights dir>/tokenizer/ or set a tokenizer checkpoint");
     }
 
     const std::string overlay = model_file("overlay");
     const std::string ngram = model_file("ngram");
-    const std::string mtp = model_file("mtp");
-    const std::string vision = model_file("vision");
+    // A llamacpp-recipe entry names the sidecars "draft"/"mmproj"; the halowin
+    // recipe names them "mtp"/"vision". Accept either so one entry serves both.
+    std::string mtp = model_file("mtp");
+    if (mtp.empty()) mtp = model_file("draft");
+    std::string vision = model_file("vision");
+    if (vision.empty()) vision = model_file("mmproj");
 
-    std::string api_path = resolve_engine_binary(/*engine=*/false);
-    std::string engine_path = resolve_engine_binary(/*engine=*/true);
+    std::string api_path = resolve_binary(/*engine=*/false);
+    std::string engine_path = resolve_binary(/*engine=*/true);
     if (api_path.empty() || engine_path.empty()) {
         try {
             backend_manager_->install_backend("halowin", "win");
         } catch (const std::exception& e) {
             LOG(WARNING, "HaloWin") << "Engine install failed: " << e.what() << std::endl;
         }
-        if (api_path.empty()) api_path = resolve_engine_binary(/*engine=*/false);
-        if (engine_path.empty()) engine_path = resolve_engine_binary(/*engine=*/true);
+        if (api_path.empty()) api_path = resolve_binary(/*engine=*/false);
+        if (engine_path.empty()) engine_path = resolve_binary(/*engine=*/true);
     }
     if (api_path.empty()) {
         throw std::runtime_error(
@@ -506,7 +541,14 @@ void HalowinServer::load(const std::string& model_name,
         {"QWENOX_KVSNAP_MAX_GB", "20"}, {"QWENOX_RCKPT_MAX", "8"},
         {"QWENOX_KV_PAGED", "1"},
     };
-    // Prefill chunk: an empty option keeps the engine default (Windows 8192);
+    // Prefill 4-bit MoE (W4A4 iu4): upstream ships MOE_A4=3 (gate/up + down) in
+    // the release service.conf, but the engine is spawned directly here, so
+    // nothing would turn it on. 3 is the upstream production default; 0 restores
+    // the full-precision prefill path. Only affects hgn v2 4-bit weights.
+    const std::string moe_a4 = option_string(options, "halowin_moe_a4");
+    env.push_back({"QWENOX_MOE_A4", moe_a4.empty() ? "3" : moe_a4});
+
+    // Prefill chunk: an empty option keeps the engine default (Windows 6144);
     // 4096 shrinks the prefill workspace by ~3.5 GiB at a small PP cost.
     const std::string prefill_chunk = option_string(options, "halowin_prefill_chunk");
     if (!prefill_chunk.empty()) {
@@ -523,13 +565,24 @@ void HalowinServer::load(const std::string& model_name,
     const std::string parallel = option_string(options, "halowin_parallel");
     env.push_back({"QWENOX_PARALLEL", parallel.empty() ? "1" : parallel});
 
-    // Positional checkpoint order mirrors start_hgn.sh: main, overlay (v1 only),
-    // the split n-gram table (v2 only; skipped when it is the main file), MTP.
+    if (is_gguf) {
+        // Pure-GGUF weights (upstream G3.3) — the same shards llama.cpp uses. An
+        // explicit (possibly empty) MTP value disables the engine's own
+        // mtp-*.gguf auto-discovery so a stray sidecar cannot change the drafter.
+        env.push_back({"QWENOX_GGUF", main_path});
+        env.push_back({"QWENOX_GGUF_DENSE", "1"});
+        env.push_back({"QWENOX_GGUF_MTP", mtp});
+    }
+
+    // hgn bundles pass every component positionally (start_hgn.sh order); GGUF
+    // takes only the first shard here, with MTP supplied through the env above.
     std::vector<std::string> engine_args;
     engine_args.push_back(main_path);
-    if (!overlay.empty()) engine_args.push_back(overlay);
-    if (!ngram.empty() && ngram != main_path) engine_args.push_back(ngram);
-    if (!mtp.empty()) engine_args.push_back(mtp);
+    if (!is_gguf) {
+        if (!overlay.empty()) engine_args.push_back(overlay);
+        if (!ngram.empty() && ngram != main_path) engine_args.push_back(ngram);
+        if (!mtp.empty()) engine_args.push_back(mtp);
+    }
     engine_args.push_back("--serve");
     engine_args.push_back("--host");
     engine_args.push_back("127.0.0.1");

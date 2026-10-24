@@ -39,7 +39,8 @@ lemonade backends install halowin:win
 
 ## 模型目录
 
-HaloWin 的模型是一组 **`.hgn` 文件 + `tokenizer/`**，不是 GGUF。默认扫描
+HaloWin 有两种权重：**`.hgn` 包**（本节）或**纯 GGUF**（下一节）。`halowin` 配方的默认发现只扫
+`.hgn` 目录；GGUF 走 `llamacpp` 配方里的 `halowin` 驱动。`.hgn` 权重默认扫描
 `<models_dir>\halowin\`（可用 `halowin.halowin_models_dir` 改），每个子目录为一个模型：
 
 ```text
@@ -62,6 +63,55 @@ HaloWin 的模型是一组 **`.hgn` 文件 + `tokenizer/`**，不是 GGUF。默�
 > `halowin`，`recipe: "halowin"`）。模型配置弹窗按模型的 recipe 过滤：与当前模型不匹配的
 > 引擎会置灰，halowin 模型会自动选中 `HaloWin`。
 
+## GGUF 权重（llamacpp 驱动）
+
+引擎 G3.3 起可直接加载**纯 GGUF**（与 llama.cpp / gufo 用同一批文件），不再需要 `.hgn`。
+LMES 把它接成 `llamacpp` 配方里的一个**引擎驱动**：模型条目保持 `recipe: "llamacpp"`，在"引擎"下拉里
+选 `halowin_gfx1151` 即可 —— 和在 gufo / llama.cpp 之间切换是同一个动作，不需要为它单独建模型条目。
+
+**注册引擎**（`config.json`；`path` 指向 OpenAI 前端，引擎可执行文件与它同目录）：
+
+```jsonc
+"llamacpp": {
+  "custom_engines": {
+    "halowin_gfx1151": {
+      "path": "…\\data\\cache\\bin\\halowin\\win\\qwenox-win.exe",
+      "backend": "rocm",
+      "driver": "halowin"
+    }
+  }
+}
+```
+
+> 引擎 id 用 `halowin_gfx1151` 而不是 `halowin`：`/engines` 里已经有一个配方级 `halowin`，同名会撞。
+
+模型侧需要的文件（检查点名与 llama.cpp 通用，驱动会做别名）：
+
+| 用途 | llama.cpp 检查点 | 也接受 | 说明 |
+|---|---|---|---|
+| 权重 | `main` | — | GGUF **第 1 个分片**，其余分片必须同目录 |
+| MTP 草稿 | `draft` | `mtp` | `mtp-…-shared-Q8_0.gguf`；留空 = 不投机 |
+| 视觉 | `mmproj` | `vision` | 引擎要求 **BF16** |
+| 分词器 | `tokenizer`（目录） | — | **必需**；未显式给时自动向上 3 层找 `<目录>/tokenizer/tokenizer.json` |
+
+`tokenizer/tokenizer.json` 不在 GGUF 仓库里，需从原模型仓库（如 `unsloth/Qwen3.8-Flash-Next`）补一份放到权重目录旁。
+
+**Windows 量化选择**：上游文档对 Windows 推荐 `UD-IQ4_XS`（3 分片，约 87 GiB）；本机实测
+`UD-Q4_K_XL`（4 分片，103.7 GiB）也能跑。
+
+**驱动参数**（模型配置 → 参数框；此驱动下参数框映射到 `halowin_engine_args`）：
+`halowin_engine_args` / `halowin_args` / `halowin_parallel` / `halowin_prefill_chunk` / `halowin_mtp_gamma` / `halowin_moe_a4`，
+语义见下面"配置项"表。
+
+**本机实测**（Flash-Next UD-Q4_K_XL，`ctx 32768`，Windows / gfx1151 / 55W 功耗墙）：
+
+| 项 | 结果 |
+|---|---|
+| 加载 | 25–29 s；双进程 `qwenox-engine-win.exe`（约 32 GB 驻留）+ `qwenox-win.exe` |
+| 对话 | 38.2 tok/s（MTP 44 提议 / 26 接受）；流式 36 chunk 正常 |
+| 卸载 | 双进程均清理干净，无残留 |
+| 同一模型条目切回 gufo | 36.7 tok/s，无回归 |
+
 ## 使用
 
 ```powershell
@@ -77,7 +127,8 @@ curl -X POST http://localhost:13305/v1/chat/completions -H "Content-Type: applic
 | `halowin_models_dir` | `""`（= `<models_dir>\halowin`） | 扫描 `.hgn` 模型的目录 |
 | `halowin_args` | `""` | 追加给 `qwenox-win`（API 前端）的参数 |
 | `halowin_engine_args` | `""` | 追加给 `qwenox-engine` 的参数 |
-| `halowin_prefill_chunk` | `""` | prefill 分段（token），透传为引擎环境变量 `QWENOX_PREFILL_CHUNK`；Windows 设 `4096` 可省约 3.5 GiB 显存（PP 约慢 2%），留空则用引擎默认 8192 |
+| `halowin_prefill_chunk` | `""` | prefill 分段（token），透传为引擎环境变量 `QWENOX_PREFILL_CHUNK`；Windows 设 `4096` 可省约 3.5 GiB 显存（PP 约慢 2%），留空则用引擎默认 6144 |
+| `halowin_moe_a4` | `3` | prefill 4-bit MoE 激活（W4A4 iu4），透传为 `QWENOX_MOE_A4`（上游发行 `service.conf` 的默认也是 3）。`3` = gate/up + down 全开，`0` = 关闭。只对 hgn v2 4-bit 权重生效，只影响 prefill（decode 不变）；精度代价为 prompt KLD +0.015~0.035 |
 | `halowin_mtp_gamma` | `""` | MTP 投机草拟长度 1–8，透传为 `QWENOX_SPEC_GAMMA`；**留空 = 上游默认（auto）**：greedy 用 4、采样自适应 3–7 |
 | `halowin_parallel` | `""` | 并发槽位 1–8，透传为 `QWENOX_PARALLEL`；留空/`1` = 单路。槽位共享分页 KV 池（默认共 256K），每多一路约多占 0.12 GiB 显存 |
 | `win_bin` | `"builtin"` | 标准二进制覆盖钩子（`LEMONADE_HALOWIN_WIN_BIN`） |
