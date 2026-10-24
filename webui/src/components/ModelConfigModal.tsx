@@ -30,10 +30,11 @@ export default function ModelConfigModal({
   const compatible = (e: EngineInfo) => engineRecipe(e) === effectiveRecipe;
   const [engine, setEngine] = useState("");
   // An engine can drive a different program through the same recipe (a "gufo"
-  // driver runs gufo instead of llama-server); its arguments live in that
-  // driver's namespace, not in llamacpp_args.
+  // driver runs gufo instead of llama-server, "halowin" runs the qwenox stack);
+  // its arguments live in that driver's namespace, not in llamacpp_args.
   const selectedDriver = engines.find((e) => e.id === engine)?.driver || "llamacpp";
   const argsKey = selectedDriver === "gufo" ? "gufo_args"
+    : selectedDriver === "halowin" ? "halowin_engine_args"
     : isLlama ? "llamacpp_args"
     : `${effectiveRecipe}_args`;
   const [mode, setMode] = useState<"text" | "builder">("text");
@@ -72,6 +73,12 @@ export default function ModelConfigModal({
         const saved = r.saved ?? {};
         const dflt = r.defaults ?? {};
         let eng = String(eff.llamacpp_engine ?? "");
+        // Only this recipe's engines are offered: an engine registered under
+        // another recipe cannot be driven by this model entry, so a stale value
+        // must not leave the picker pointing at a hidden option.
+        if (eng && !engines.some((e) => e.id === eng && engineRecipe(e) === effectiveRecipe)) {
+          eng = "";
+        }
         // Non-llama.cpp models have no llamacpp_engine option; default the picker
         // to this recipe's engine so the installed backend is shown as selected.
         if (!eng && !isLlama) {
@@ -250,14 +257,11 @@ export default function ModelConfigModal({
               }}
             >
               <option value="">—</option>
-              {engines.map((e) => {
-                const ok = compatible(e);
-                return (
-                  <option key={e.id} value={e.id} disabled={!ok}>
-                    {e.name} ({e.backend || "?"}{e.driver && e.driver !== "llamacpp" ? `, ${e.driver}` : ""}){ok ? "" : ` — ${t("models.engineWrongRecipe")}`}
-                  </option>
-                );
-              })}
+              {engines.filter(compatible).map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.name} ({e.backend || "?"}{e.driver && e.driver !== "llamacpp" ? `, ${e.driver}` : ""})
+                </option>
+              ))}
             </select>
             <div className="hint">{t("models.engineHint")}</div>
           </label>
