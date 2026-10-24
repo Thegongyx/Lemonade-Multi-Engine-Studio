@@ -57,6 +57,39 @@ std::string lower_ascii(std::string value) {
     return value;
 }
 
+// Compares dotted numeric versions ("v0.0.9" >= "v0.0.8"), ignoring any
+// non-numeric suffix such as "-fix-2".
+int compare_version(const std::string& a, const std::string& b) {
+    const auto parse = [](const std::string& text) {
+        std::vector<long> parts;
+        long current = 0;
+        bool any = false;
+        for (char c : text) {
+            if (std::isdigit(static_cast<unsigned char>(c))) {
+                current = current * 10 + (c - '0');
+                any = true;
+            } else if (c == '.') {
+                parts.push_back(any ? current : 0);
+                current = 0;
+                any = false;
+            } else if (any) {
+                break;
+            }
+        }
+        parts.push_back(any ? current : 0);
+        return parts;
+    };
+    const std::vector<long> pa = parse(a);
+    const std::vector<long> pb = parse(b);
+    const size_t n = std::max(pa.size(), pb.size());
+    for (size_t i = 0; i < n; ++i) {
+        const long va = i < pa.size() ? pa[i] : 0;
+        const long vb = i < pb.size() ? pb[i] : 0;
+        if (va != vb) return va < vb ? -1 : 1;
+    }
+    return 0;
+}
+
 // Whitespace splitter that keeps quoted spans intact, so an argument like
 // --chat-template-kwargs "{\"x\":1}" survives.
 std::vector<std::string> split_args(const std::string& text) {
@@ -274,16 +307,21 @@ InstallParams HalowinServer::get_install_params(const std::string& /*backend*/,
                                                 const std::string& version) {
     InstallParams params;
     params.repo = "IIIIIllllIIIIIlllll/gfx1151-engine";
-    // v0.0.8 renamed the Windows asset to qwenox-<tag>-windows.zip (and the
-    // project to Qwenox); v0.0.4..v0.0.7 shipped releases-windows.zip, and
-    // v0.0.1..v0.0.3 release-windows.zip (single "release").
-    if (version.rfind("v0.0.8", 0) == 0) {
+    // Upstream renamed the Windows asset twice:
+    //   v0.0.1..v0.0.3  release-windows.zip
+    //   v0.0.4..v0.0.7  releases-windows.zip
+    //   v0.0.8          qwenox-v0.0.8-windows.zip
+    //   v0.0.9+         qwenox-0.0.9-win64.zip (tag without the leading "v")
+    // Parse the naming rules instead of pinning a single name so a version bump
+    // only has to touch backend_versions.json.
+    if (compare_version(version, "v0.0.9") >= 0) {
+        params.filename = "qwenox-" + version.substr(version.front() == 'v' ? 1 : 0) + "-win64.zip";
+    } else if (compare_version(version, "v0.0.8") >= 0) {
         params.filename = "qwenox-" + version + "-windows.zip";
-    } else if (version.rfind("v0.0.1", 0) == 0 || version.rfind("v0.0.2", 0) == 0 ||
-               version.rfind("v0.0.3", 0) == 0) {
-        params.filename = "release-windows.zip";
-    } else {
+    } else if (compare_version(version, "v0.0.4") >= 0) {
         params.filename = "releases-windows.zip";
+    } else {
+        params.filename = "release-windows.zip";
     }
     return params;
 }
